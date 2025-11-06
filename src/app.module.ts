@@ -8,29 +8,20 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import mailConfig from './config/mail.config';
 import environmentValidation from './config/environment.validation';
-import { MongooseModule } from '@nestjs/mongoose';
-import { UsersModule } from './users/users.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { PaginationModule } from './common/pagination/pagination.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
-import { SocketModule } from './socket/socket.module';
-import { AuthenticationGuard } from './auth/guards/authentication/authentication.guard';
-import { AccessTokenGuard } from './auth/guards/access-token/access-token.guard';
 import { JwtModule } from '@nestjs/jwt';
-import { OtpModule } from './otp/otp.module';
-import jwtConfig from './auth/config/jwt.config';
-import { RolesGuard } from './auth/guards/roles/roles.guard';
-import { RolesModule } from './roles/roles.module';
-import { PermissionsModule } from './permissions/permissions.module';
-import { ModulesModule } from './modules/modules.module';
-import { RolePermissionsModule } from './role-permissions/role-permissions.module';
-import { EncryptionInterceptor } from './common/interceptors/encryption.interceptor';
-import { EncryptionsModule } from './encryptions/encryptions.module';
-import { PaginationWithAggregationProvider } from './common/pagination/providors/pagination-with-aggregation.provider';
-import { PaginationProvider } from './common/pagination/providors/pagination.provide';
-import { MongoExceptionInterceptor } from './common/interceptors/mongo-exception.interceptor';
-import { TestModule } from './test/test.module';
+import { GlobalExceptionFilter } from './common/filters';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { CommonModule } from './common/common.module';
+import { CityModule } from './city/city.module';
+import { ReligionModule } from './religion/religion.module';
+import { RishtanagarUsersModule } from './rishtanagar-users/users.module';
+import { RishtanagarAuthenticationModule } from './rishtanagar-auth/authentication.module';
+import * as entities from './common/entities';
+
 const ENV = process.env.NODE_ENV;
 @Module({
   imports: [
@@ -38,30 +29,54 @@ const ENV = process.env.NODE_ENV;
      * Static files
      */
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '../', 'public'), // Serve static files from the "public" folder
+      rootPath: join(__dirname, '../', 'public'),
     }),
     /**
      * Environment Config
      */
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: !ENV ? '.env' : `.env.${ENV}`,
+      envFilePath: ['.env', `.env.${ENV}`].filter(Boolean),
       load: [appConfig, databaseConfig, mailConfig],
       validationSchema: environmentValidation,
     }),
     /**
-    /**
-     * Mongodb config
+     * TypeORM MySQL config
      */
-    MongooseModule.forRootAsync({
+    TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('database.connectionString'),
-      }),
+      useFactory: (configService: ConfigService) => {
+        // ✅ Put console.log here
+        console.log('database config', {
+          host: configService.get<string>('database.host'),
+          port: configService.get<number>('database.port'),
+          user: configService.get<string>('database.username'),
+          password: configService.get<string>('database.password'),
+          database: configService.get<string>('database.database'),
+        });
+
+        return {
+          type: 'mysql',
+          host: configService.get<string>('database.host'),
+          port: configService.get<number>('database.port'),
+          username: configService.get<string>('database.username'),
+          password: configService.get<string>('database.password'),
+          database: configService.get<string>('database.database'),
+          entities: Object.values(entities),
+          synchronize:
+            configService.get<string>('database.synchronize') === 'true',
+          logging: configService.get<string>('database.logging') === 'true',
+        };
+      },
     }),
-    JwtModule.registerAsync(jwtConfig.asProvider()),
-    ConfigModule.forFeature(jwtConfig),
+
+    /**
+     * JWT Module
+     */
+    JwtModule.register({
+      global: true,
+    }),
     /**
      * Nodemailer config
      */
@@ -72,68 +87,50 @@ const ENV = process.env.NODE_ENV;
         transport: {
           host: configService.get<string>('mail.mailHost'),
           port: configService.get<number>('mail.mailPort'),
-          secure: true, // Use TLS/SSL for port 465
+          secure: true,
           auth: {
             user: configService.get<string>('mail.mailAddress'),
             pass: configService.get<string>('mail.mailPassword'),
           },
         },
         defaults: {
-          from: `"RMG Construction" <${configService.get<string>('mail.mailAddress')}>`,
+          from: `"RishtaNagar" <${configService.get<string>('mail.mailAddress')}>`,
         },
       }),
     }),
     /**
-     * Pagination module
+     * Application Modules
      */
-    PaginationModule,
-    UsersModule,
-    SocketModule,
-    OtpModule,
-    RolesModule,
-    PermissionsModule,
-    ModulesModule,
-    RolePermissionsModule,
-    EncryptionsModule,
-    TestModule,
+    CommonModule,
+    CityModule,
+    ReligionModule,
+    RishtanagarUsersModule,
+    RishtanagarAuthenticationModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-
+    /**
+     * Global Exception Filter
+     */
     {
-      provide: APP_INTERCEPTOR,
-      useFactory: (configService: ConfigService) => {
-        const isEncryptionActive =
-          configService.get<string>('ENCRYPTION_ACTIVE') === 'true';
-        return new EncryptionInterceptor(isEncryptionActive, [
-          '/encryptions/encrypt',
-          '/encryptions/decrypt',
-        ]);
-      },
-      inject: [ConfigService],
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
     },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: MongoExceptionInterceptor,
-    },
-
+    /**
+     * Global Interceptors
+     */
     {
       provide: APP_INTERCEPTOR,
       useClass: DataResponseInterceptor,
     },
+    /**
+     * Global Guards - JWT Authentication
+     */
     {
       provide: APP_GUARD,
-      useClass: AuthenticationGuard,
+      useClass: JwtAuthGuard,
     },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
-
-    AccessTokenGuard,
-    PaginationWithAggregationProvider,
-    PaginationProvider,
   ],
 })
 export class AppModule {}
