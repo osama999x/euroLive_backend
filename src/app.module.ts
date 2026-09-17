@@ -1,135 +1,109 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { DataResponseInterceptor } from './common/interceptors/data-response.interceptor';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import appConfig from './config/app.config';
-import databaseConfig from './config/database.config';
-import mailConfig from './config/mail.config';
-import environmentValidation from './config/environment.validation';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { MailerModule } from '@nestjs-modules/mailer';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
-import { JwtModule } from '@nestjs/jwt';
-import { GlobalExceptionFilter } from './common/filters';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import {
+  appConfig,
+  databaseConfig,
+  envValidationSchema,
+  jwtConfig,
+  mailConfig,
+  redisConfig,
+} from './config';
 import { CommonModule } from './common/common.module';
-import { CityModule } from './city/city.module';
-import { ReligionModule } from './religion/religion.module';
-import { RishtanagarUsersModule } from './rishtanagar-users/users.module';
-import { RishtanagarAuthenticationModule } from './rishtanagar-auth/authentication.module';
-import * as entities from './common/entities';
+import { HttpExceptionFilter } from './common/filters';
+import {
+  AccountTypeGuard,
+  JwtAuthGuard,
+  PermissionsGuard,
+  RolesGuard,
+} from './common/guards';
+import { LoggingInterceptor, TransformInterceptor } from './common/interceptors';
+import { DatabaseModule } from './database/database.module';
+import { InfrastructureModule } from './infrastructure/infrastructure.module';
+import { HealthModule } from './modules/health/health.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
+import { WalletModule } from './modules/wallet/wallet.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { UsersModule } from './modules/users/users.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { ResellersModule } from './modules/resellers/resellers.module';
+import { IdentityModule } from './modules/identity/identity.module';
+import { RbacModule } from './modules/rbac/rbac.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { SeedModule } from './modules/seed/seed.module';
 
-const ENV = process.env.NODE_ENV;
 @Module({
   imports: [
-    /**
-     * Static files
-     */
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '../', 'public'),
-    }),
-    /**
-     * Environment Config
-     */
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', `.env.${ENV}`].filter(Boolean),
-      load: [appConfig, databaseConfig, mailConfig],
-      validationSchema: environmentValidation,
-    }),
-    /**
-     * TypeORM MySQL config
-     */
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        // ✅ Put console.log here
-        console.log('database config', {
-          host: configService.get<string>('database.host'),
-          port: configService.get<number>('database.port'),
-          user: configService.get<string>('database.username'),
-          password: configService.get<string>('database.password'),
-          database: configService.get<string>('database.database'),
-        });
-
-        return {
-          type: 'mysql',
-          host: configService.get<string>('database.host'),
-          port: configService.get<number>('database.port'),
-          username: configService.get<string>('database.username'),
-          password: configService.get<string>('database.password'),
-          database: configService.get<string>('database.database'),
-          entities: Object.values(entities),
-          synchronize:
-            configService.get<string>('database.synchronize') === 'true',
-          logging: configService.get<string>('database.logging') === 'true',
-        };
+      cache: true,
+      envFilePath: ['.env', `.env.${process.env.NODE_ENV}`],
+      load: [appConfig, databaseConfig, redisConfig, jwtConfig, mailConfig],
+      validationSchema: envValidationSchema,
+      validationOptions: {
+        abortEarly: false,
+        allowUnknown: true,
       },
     }),
-
-    /**
-     * JWT Module
-     */
-    JwtModule.register({
-      global: true,
-    }),
-    /**
-     * Nodemailer config
-     */
-    MailerModule.forRootAsync({
-      imports: [ConfigModule],
+    ThrottlerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        transport: {
-          host: configService.get<string>('mail.mailHost'),
-          port: configService.get<number>('mail.mailPort'),
-          secure: true,
-          auth: {
-            user: configService.get<string>('mail.mailAddress'),
-            pass: configService.get<string>('mail.mailPassword'),
+      useFactory: (config: ConfigService) => ({
+        throttlers: [
+          {
+            ttl: config.get<number>('app.throttleTtl'),
+            limit: config.get<number>('app.throttleLimit'),
           },
-        },
-        defaults: {
-          from: `"RishtaNagar" <${configService.get<string>('mail.mailAddress')}>`,
-        },
+        ],
       }),
     }),
-    /**
-     * Application Modules
-     */
+    DatabaseModule,
+    InfrastructureModule,
     CommonModule,
-    CityModule,
-    ReligionModule,
-    RishtanagarUsersModule,
-    RishtanagarAuthenticationModule,
+    HealthModule,
+    RealtimeModule,
+    WalletModule,
+    AuditModule,
+    UsersModule,
+    CatalogModule,
+    ResellersModule,
+    IdentityModule,
+    RbacModule,
+    AdminModule,
+    SeedModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
-    /**
-     * Global Exception Filter
-     */
     {
       provide: APP_FILTER,
-      useClass: GlobalExceptionFilter,
+      useClass: HttpExceptionFilter,
     },
-    /**
-     * Global Interceptors
-     */
     {
       provide: APP_INTERCEPTOR,
-      useClass: DataResponseInterceptor,
+      useClass: LoggingInterceptor,
     },
-    /**
-     * Global Guards - JWT Authentication
-     */
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AccountTypeGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
   ],
 })

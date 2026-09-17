@@ -1,73 +1,82 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# King Queen Live
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Scalable NestJS API for the King Queen Live app. PostgreSQL for data, Redis for cache/pubsub, Socket.IO for realtime.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack
 
-## Description
+- NestJS 10
+- PostgreSQL + TypeORM (migrations, connection pooling)
+- Redis (cache, counters, Socket.IO adapter for multi-instance)
+- JWT utilities (access + refresh)
+- Mailer (optional until SMTP is configured)
+- Swagger, Helmet, rate limiting, request IDs
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Project structure
 
-## Installation
-
-```bash
-$ npm install
+```
+src/
+  config/                 # env-backed typed config
+  common/                 # guards, filters, interceptors, dto, utils
+  database/               # TypeORM module, base entity, migrations
+  infrastructure/
+    redis/                # Redis client + Socket.IO adapter
+    jwt/                  # token sign/verify
+    mail/                 # transactional email
+  modules/
+    health/               # liveness + readiness
+    realtime/             # Socket.IO gateway (/live)
+    <your-modules>/       # add features here
+  app.module.ts
+  main.ts
 ```
 
-## Running the app
+Add new features under `src/modules/` — keep `common/` and `infrastructure/` free of business logic.
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run generate-module -- users
 ```
 
-## Test
+## Setup
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cp .env.example .env
+docker compose up -d
+npm install
+npm run start:dev
 ```
 
-## Support
+| | URL |
+|---|---|
+| API | http://localhost:3000/api/v1 |
+| Health | http://localhost:3000/api/v1/health |
+| Ready | http://localhost:3000/api/v1/health/ready |
+| Swagger | http://localhost:3000/api-docs (`admin` / `admin123`) |
+| Socket.IO | `ws://localhost:3000/live` |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+`DB_SYNC=true` is for local development only. Use migrations in staging/production:
 
-## Stay in touch
+```bash
+npm run migration:generate -- src/database/migrations/CreateUsers
+npm run migration:run
+```
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## How to add a module
 
-## License
+1. Generate it: `npm run generate-module -- bookings`
+2. Extend `BaseEntity` for tables
+3. Register the entity with `TypeOrmModule.forFeature([...])`
+4. Return data from controllers — the interceptor wraps `{ success, statusCode, message, data }`
+5. Use `ApiResponseDto.ok(data, 'message')` when you need a custom message
+6. Protect routes with `@UseGuards(JwtAuthGuard)` and `@Roles('admin')`
+7. Use `RedisService` for cache / locks / pubsub
+8. Use `MailService.send(...)` for email
 
-Nest is [MIT licensed](LICENSE).
+To lock **all** routes behind JWT, uncomment `JwtAuthGuard` as `APP_GUARD` in `app.module.ts` and mark public routes with `@Public()`.
+
+## Production notes
+
+- Set `DB_SYNC=false` and run migrations
+- Use strong `JWT_SECRET` / `JWT_REFRESH_SECRET`
+- Point `CORS_ORIGIN` at real frontends
+- Redis adapter lets multiple API instances share Socket.IO rooms
+- `/health` is liveness; `/health/ready` checks Postgres + Redis (use this for load balancers)

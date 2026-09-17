@@ -1,44 +1,26 @@
 const { execSync } = require('child_process');
 
-const moduleName = process.argv[2];
-if (!moduleName) {
-  console.error('Please provide a module name.');
+const name = process.argv[2];
+
+if (!name) {
+  console.error('Usage: npm run generate-module -- <name>');
   process.exit(1);
 }
 
-const pluralizedName = `${moduleName}s`;
+const path = `modules/${name}`;
 
 try {
-  console.log(`Generating module: ${pluralizedName}`);
-  execSync(`npx nest g module ${pluralizedName}`, { stdio: 'inherit' });
-
-  console.log(`Generating controller: ${pluralizedName}`);
-  execSync(`npx nest g co ${pluralizedName} --no-spec`, { stdio: 'inherit' });
-
-  console.log(`Generating service: ${pluralizedName}`);
-  execSync(
-    `npx nest g service ${pluralizedName}/providers/${pluralizedName} --no-spec --flat`,
-    { stdio: 'inherit' },
-  );
-
-  console.log(`Generating schema: ${pluralizedName}`);
-  execSync(
-    `npx nest g class ${pluralizedName}/${moduleName}.schema --no-spec --flat`,
-    { stdio: 'inherit' },
-  );
-
-  console.log(`Generating DTOs: ${pluralizedName}`);
-  execSync(
-    `npx nest g class ${pluralizedName}/dtos/create-${moduleName}.dto --no-spec --flat`,
-    { stdio: 'inherit' },
-  );
-  execSync(
-    `npx nest g class ${pluralizedName}/dtos/update-${moduleName}.dto --no-spec --flat`,
-    { stdio: 'inherit' },
-  );
-
-  console.log('Module generation completed successfully.');
+  execSync(`npx nest g module ${path}`, { stdio: 'inherit' });
+  execSync(`npx nest g controller ${path} --no-spec`, { stdio: 'inherit' });
+  execSync(`npx nest g service ${path} --no-spec`, { stdio: 'inherit' });
+  execSync(`npx nest g class ${path}/dto/create-${name}.dto --no-spec --flat`, {
+    stdio: 'inherit',
+  });
+  execSync(`npx nest g class ${path}/dto/update-${name}.dto --no-spec --flat`, {
+    stdio: 'inherit',
+  });
+  console.log(`Module created at src/${path}`);
 } catch (error) {
-  console.error('An error occurred during module generation:', error.message);
+  console.error(error.message);
   process.exit(1);
 }

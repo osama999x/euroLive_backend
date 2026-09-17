@@ -1,104 +1,94 @@
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
-import * as basicAuth from 'express-basic-auth';
-import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import compression from 'compression';
+import basicAuth from 'express-basic-auth';
+import { randomUUID } from 'crypto';
+import { AppModule } from './app.module';
+import { RedisIoAdapter } from './infrastructure/redis/redis-io.adapter';
+import { Environment } from './common/enums';
 
 async function bootstrap() {
-  const SWAGGER_ENVS = ['local', 'development', 'qa', 'staging'];
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const config = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
 
-  // Disable console logs in production
-  if (process.env.NODE_ENV === 'production') {
-    console.log = () => {};
-    console.error = () => {};
-    console.warn = () => {};
-  }
+  const port = config.get<number>('app.port');
+  const apiPrefix = config.get<string>('app.apiPrefix');
+  const env = config.get<string>('app.env');
+  const bodyLimit = config.get<string>('app.bodyLimit');
+  const corsOrigin = config.get<string>('app.corsOrigin');
 
-  // Set global prefix
-  app.setGlobalPrefix('api/v1');
+  app.use(helmet());
+  app.use(compression());
+  app.use((req, res, next) => {
+    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+    req.headers['x-request-id'] = requestId;
+    res.setHeader('x-request-id', requestId);
+    next();
+  });
+  app.use(json({ limit: bodyLimit }));
+  app.use(urlencoded({ limit: bodyLimit, extended: true }));
 
-  // Enable CORS with proper configuration
   app.enableCors({
-    origin: true,
+    origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((item) => item.trim()),
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id'],
   });
 
-  // Rate limiting configuration
-  const limiter = rateLimit({
-    windowMs: 2 * 60 * 1000, // 2 minutes
-    max: 100, // Max 100 requests
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (req, res) => {
-      console.log(
-        '\n\x1b[41m\x1b[30m===== RATE LIMITER ALERT =====\x1b[0m\n' +
-          '\x1b[33m🚨 Too many requests from IP:',
-        req.ip,
-        '🚨\x1b[0m\n',
-      );
+  app.setGlobalPrefix(apiPrefix);
+  app.enableShutdownHooks();
 
-      res.status(429).json({
-        message: 'Too many requests, please try again after 2 minutes.',
-      });
-    },
-  });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
-  app.use(limiter);
+  const redisIoAdapter = new RedisIoAdapter(app, config);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
-  // Body parser configuration for large payloads
-  app.use(json({ limit: '400mb' }));
-  app.use(urlencoded({ limit: '400mb', extended: true }));
+  const swaggerEnabled =
+    config.get<boolean>('app.swaggerEnabled') && env !== Environment.Production;
 
-  // Swagger configuration
-  if (SWAGGER_ENVS.includes(process.env.NODE_ENV)) {
+  if (swaggerEnabled) {
     app.use(
       ['/api-docs', '/docs-json'],
       basicAuth({
         challenge: true,
         users: {
-          [process.env.SWAGGER_USER]: process.env.SWAGGER_PASSWORD,
+          [config.get<string>('app.swaggerUser')]: config.get<string>('app.swaggerPassword'),
         },
       }),
     );
 
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('RishtaNagar API Documentation')
-      .setDescription(
-        'Comprehensive API documentation for the RishtaNagar matrimonial platform, providing endpoints to manage users, authentication, cities, religions, and related operations.',
-      )
+      .setTitle('King Queen Live API')
+      .setDescription('King Queen Live application API')
+      .setVersion(config.get<string>('app.apiVersion'))
       .addBearerAuth()
-      .addServer('http://localhost:3000', 'Local Environment')
-      .setVersion('1.0')
+      .addServer(`http://localhost:${port}`, 'Local')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api-docs', app, document);
   }
 
-  // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
-
-  const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log('\n\x1b[44m\x1b[1m===== SERVER STARTED =====\x1b[0m\n');
-  console.log(`\x1b[36m🚀 Application running on:\x1b[0m \x1b[32mhttp://localhost:${port}\x1b[0m`);
-  console.log(`\x1b[36m📚 API Documentation:\x1b[0m \x1b[32mhttp://localhost:${port}/api-docs\x1b[0m`);
-  console.log(`\x1b[36m🌍 Environment:\x1b[0m \x1b[32m${process.env.NODE_ENV || 'development'}\x1b[0m`);
-  console.log('\n\x1b[44m\x1b[1m==========================\x1b[0m\n');
+  logger.log(`King Queen Live running on http://localhost:${port}/${apiPrefix}`);
+  logger.log(`Environment: ${env}`);
+  if (swaggerEnabled) {
+    logger.log(`Swagger: http://localhost:${port}/api-docs`);
+  }
 }
+
 bootstrap();
