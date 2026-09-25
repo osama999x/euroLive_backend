@@ -8,6 +8,7 @@ import {
   AccountType,
   StaffRole,
   TokenType,
+  AgencyStatus,
 } from '../../common/enums';
 import {
   comparePassword,
@@ -17,9 +18,13 @@ import {
   verifyTotp,
 } from '../../common/utils';
 import { JwtPayload } from '../../common/interfaces';
-import { RefreshToken, Reseller, StaffUser } from '../../database/entities';
+import { RefreshToken, Reseller, StaffUser, User } from '../../database/entities';
 import { TokenService } from '../../infrastructure/jwt/token.service';
 import { ResellersService } from '../resellers/resellers.service';
+import { UsersService } from '../users/users.service';
+import { AgenciesService } from '../agencies/agencies.service';
+import { DevicesService } from '../security/devices.service';
+import { FreezeService } from '../security/freeze.service';
 import { toStaffPublic } from './staff.mapper';
 
 export interface TokenPair {
@@ -38,6 +43,10 @@ export class AuthService {
     private readonly refreshTokens: Repository<RefreshToken>,
     private readonly tokens: TokenService,
     private readonly resellers: ResellersService,
+    private readonly users: UsersService,
+    private readonly agencies: AgenciesService,
+    private readonly devices: DevicesService,
+    private readonly freeze: FreezeService,
   ) {}
 
   async loginStaff(login: string, password: string) {
@@ -171,6 +180,47 @@ export class AuthService {
     };
   }
 
+  async loginUser(login: string, password: string, deviceId?: string, deviceName?: string) {
+    const user = await this.users.findByLogin(login);
+    if (!user || !user.passwordHash || !(await comparePassword(password, user.passwordHash))) {
+      throw new AppException('Invalid credentials', HttpStatus.UNAUTHORIZED);
+    }
+    await this.users.assertActive(user);
+    await this.freeze.assertNotFrozen('user', user.id);
+
+    await this.devices.recordLogin(user.id, deviceId, deviceName);
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      username: user.username,
+      accountType: AccountType.USER,
+    };
+    return {
+      user: this.users.toPublic(user),
+      ...(await this.issuePair(payload)),
+    };
+  }
+
+  async loginAgency(login: string, password: string) {
+    const agency = await this.agencies.findByLogin(login);
+    if (!agency || !(await this.agencies.verifyPassword(agency, password))) {
+      throw new AppException('Invalid credentials', HttpStatus.UNAUTHORIZED);
+    }
+    if (agency.status !== AgencyStatus.ACTIVE || agency.frozen) {
+      throw new AppException('Agency account is not active', HttpStatus.FORBIDDEN);
+    }
+    const payload: JwtPayload = {
+      sub: agency.id,
+      email: agency.email,
+      username: agency.username,
+      accountType: AccountType.AGENCY,
+    };
+    return {
+      agency: this.agencies.toPublic(agency),
+      ...(await this.issuePair(payload)),
+    };
+  }
+
   async refresh(refreshToken: string): Promise<TokenPair> {
     let payload: JwtPayload;
     try {
@@ -245,6 +295,8 @@ export class AuthService {
     if (flags?.canAssignBadge) permissions.push('badge');
     if (flags?.canRemove) permissions.push('remove');
     if (flags?.canSetExpiry) permissions.push('expiry');
+    if (flags?.canViewSosAlerts) permissions.push('sos');
+    if (flags?.canViewComplaintEvidence) permissions.push('complaint_evidence');
 
     return {
       sub: reseller.id,

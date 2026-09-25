@@ -31,6 +31,16 @@ import { ResellersModule } from './modules/resellers/resellers.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SecurityModule } from './modules/security/security.module';
+import { AgenciesModule } from './modules/agencies/agencies.module';
+import { HostsModule } from './modules/hosts/hosts.module';
+import { HostPortalModule } from './modules/hosts/host-portal.module';
+import { RoomsModule } from './modules/rooms/rooms.module';
+import { ComplaintsModule } from './modules/complaints/complaints.module';
+import { SosModule } from './modules/sos/sos.module';
+import { SalaryModule } from './modules/salary/salary.module';
+import { FraudModule } from './modules/fraud/fraud.module';
+import { BackupsModule } from './modules/backups/backups.module';
 import { SeedModule } from './modules/seed/seed.module';
 
 @Module({
@@ -70,6 +80,16 @@ import { SeedModule } from './modules/seed/seed.module';
     IdentityModule,
     RbacModule,
     AdminModule,
+    SecurityModule,
+    AgenciesModule,
+    HostsModule,
+    HostPortalModule,
+    RoomsModule,
+    ComplaintsModule,
+    SosModule,
+    SalaryModule,
+    FraudModule,
+    BackupsModule,
     SeedModule,
   ],
   providers: [

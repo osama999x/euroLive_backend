@@ -19,7 +19,7 @@ import {
 import { AccountType, StaffRole } from '../../common/enums';
 import { JwtPayload } from '../../common/interfaces';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUserDto, OfficialUserDto } from './dto/create-user.dto';
 import { UsersListQueryDto } from './dto/users-list-query.dto';
 import { ActorType } from '../../common/enums';
 import { AuditService } from '../audit/audit.service';
@@ -110,5 +110,27 @@ export class AdminUsersController {
       meta,
     });
     return user;
+  }
+
+  @Patch(':id/official')
+  @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Mark a user as protected Official' })
+  async official(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: OfficialUserDto,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    const saved = await this.users.setOfficial(id, dto.isOfficial, dto.officialId);
+    await this.audit.log({
+      actorType: ActorType.STAFF,
+      actorId: actor.sub,
+      action: 'user.official',
+      targetType: 'user',
+      targetId: id,
+      after: { isOfficial: saved.isOfficial, officialId: saved.officialId },
+      meta,
+    });
+    return this.users.toPublic(saved, true);
   }
 }

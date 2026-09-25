@@ -15,6 +15,8 @@ export interface AuditLogInput {
   targetId?: string;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
+  reason?: string;
+  caseNumber?: string;
   meta?: RequestMetaDto;
 }
 
@@ -36,6 +38,8 @@ export class AuditService {
       after: input.after,
       ip: input.meta?.ip,
       userAgent: input.meta?.userAgent,
+      reason: input.reason,
+      caseNumber: input.caseNumber,
     });
     return this.logs.save(row);
   }

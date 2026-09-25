@@ -5,12 +5,17 @@ import { QueryFailedError } from 'typeorm';
 import { AppException } from '../../common/exceptions';
 import {
   ActorType,
+  FreezeStatus,
+  FreezeType,
+  FraudCaseStatus,
   LedgerDirection,
   LedgerType,
   WalletCurrency,
   WalletOwnerType,
 } from '../../common/enums';
-import { LedgerEntry, Wallet } from '../../database/entities';
+import { FraudCase, LedgerEntry, Wallet } from '../../database/entities';
+import { FreezeService } from '../security/freeze.service';
+import { formatCaseNumber } from '../../common/utils';
 import { nextBalance } from './wallet.util';
 
 export interface LedgerActor {
@@ -52,6 +57,9 @@ export class WalletService {
     private readonly wallets: Repository<Wallet>,
     @InjectRepository(LedgerEntry)
     private readonly ledger: Repository<LedgerEntry>,
+    @InjectRepository(FraudCase)
+    private readonly fraudCases: Repository<FraudCase>,
+    private readonly freeze: FreezeService,
   ) {}
 
   async getOrCreateWallet(
@@ -157,6 +165,9 @@ export class WalletService {
 
       const transferId = input.idempotencyKey ?? crypto.randomUUID();
 
+      await this.freeze.assertNotFrozen(WalletOwnerType.RESELLER, input.resellerId);
+      await this.freeze.assertNotFrozen(WalletOwnerType.USER, input.userId);
+
       let debit: LedgerEntry;
       try {
         debit = await this.applyOnLockedWallet(manager, {
@@ -255,6 +266,14 @@ export class WalletService {
       id: wallet.id,
     });
 
+    if (
+      input.type !== LedgerType.FRAUD_CORRECTION &&
+      input.type !== LedgerType.SALARY_RELEASE &&
+      input.type !== LedgerType.AGENCY_SHARE
+    ) {
+      await this.freeze.assertNotFrozen(input.ownerType, input.ownerId);
+    }
+
     return this.applyOnLockedWallet(manager, {
       wallet: locked,
       currency: input.currency,
@@ -321,7 +340,51 @@ export class WalletService {
       metadata: params.metadata,
     });
 
-    return manager.getRepository(LedgerEntry).save(entry);
+    const saved = await manager.getRepository(LedgerEntry).save(entry);
+    await this.flagFraud(params.wallet, saved);
+    return saved;
+  }
+
+  private async flagFraud(wallet: Wallet, entry: LedgerEntry): Promise<void> {
+    if (
+      entry.direction !== LedgerDirection.CREDIT ||
+      entry.type === LedgerType.SALARY_RELEASE ||
+      entry.type === LedgerType.AGENCY_SHARE ||
+      entry.type === LedgerType.FRAUD_CORRECTION
+    ) {
+      return;
+    }
+
+    let signal: string | null = null;
+    if (entry.amount >= 100000) {
+      signal = 'impossible_jump';
+    } else if (entry.amount >= 50000) {
+      signal = 'velocity';
+    }
+    if (!signal) {
+      return;
+    }
+
+    const freeze = await this.freeze.freeze({
+      ownerType: wallet.ownerType,
+      ownerId: wallet.ownerId,
+      freezeType: FreezeType.COINS,
+      reason: `Fraud signal: ${signal}`,
+      actorType: ActorType.SYSTEM,
+      status: FreezeStatus.FROZEN,
+    });
+    const seq = (await this.fraudCases.count()) + 1;
+    await this.fraudCases.save(
+      this.fraudCases.create({
+        caseNumber: formatCaseNumber('FRD', seq),
+        ownerType: wallet.ownerType,
+        ownerId: wallet.ownerId,
+        signal,
+        freezeId: freeze.id,
+        ledgerRefs: { ledgerId: entry.id, amount: entry.amount, type: entry.type },
+        status: FraudCaseStatus.OPEN,
+      }),
+    );
   }
 
   private async lockWallet(manager: EntityManager, walletId: string): Promise<void> {

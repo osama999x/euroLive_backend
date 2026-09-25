@@ -2,6 +2,7 @@ export enum CatalogItemType {
   FRAME = 'frame',
   ENTRY = 'entry',
   BADGE = 'badge',
+  WALLPAPER = 'wallpaper',
 }
 
 export enum UserItemStatus {
@@ -31,4 +32,6 @@ export enum ResellerPermissionFlag {
   BADGE = 'badge',
   REMOVE = 'remove',
   EXPIRY = 'expiry',
+  SOS = 'sos',
+  COMPLAINT_EVIDENCE = 'complaint_evidence',
 }

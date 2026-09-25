@@ -7,3 +7,4 @@ export * from './wallet.enum';
 export * from './ledger.enum';
 export * from './catalog.enum';
 export * from './token-type.enum';
+export * from './euro-live.enum';

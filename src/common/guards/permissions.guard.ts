@@ -56,6 +56,8 @@ export class PermissionsGuard implements CanActivate {
       [ResellerPermissionFlag.BADGE]: perms.canAssignBadge,
       [ResellerPermissionFlag.REMOVE]: perms.canRemove,
       [ResellerPermissionFlag.EXPIRY]: perms.canSetExpiry,
+      [ResellerPermissionFlag.SOS]: perms.canViewSosAlerts,
+      [ResellerPermissionFlag.COMPLAINT_EVIDENCE]: perms.canViewComplaintEvidence,
     };
 
     const missing = required.filter((flag) => !flags[flag]);

@@ -1,9 +1,9 @@
 import { Column, Entity, Index } from 'typeorm';
 import { ActorType } from '../../common/enums';
-import { BaseEntity } from './base.entity';
+import { ImmutableEntity } from './immutable.entity';
 
 @Entity('admin_action_logs')
-export class AdminActionLog extends BaseEntity {
+export class AdminActionLog extends ImmutableEntity {
   @Column({ type: 'varchar' })
   actorType: ActorType;
 
@@ -32,4 +32,11 @@ export class AdminActionLog extends BaseEntity {
 
   @Column({ type: 'varchar', nullable: true })
   userAgent?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  reason?: string;
+
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  caseNumber?: string;
 }

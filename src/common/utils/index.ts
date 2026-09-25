@@ -5,3 +5,4 @@ export * from './bigint.util';
 export * from './totp.util';
 export * from './public-id.util';
 export * from './duration.util';
+export * from './case-number.util';

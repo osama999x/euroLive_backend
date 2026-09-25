@@ -37,6 +37,8 @@ export interface CreateResellerInput {
   creditLimit?: number;
   commissionRate?: number;
   initialBalance?: number;
+  isOfficial?: boolean;
+  officialId?: string;
   permissions?: Partial<ResellerPermissions>;
 }
 
@@ -80,6 +82,10 @@ export class ResellersService {
       creditLimit: input.creditLimit ?? 0,
       commissionRate: input.commissionRate ?? 0,
       status: AccountStatus.ACTIVE,
+      isOfficial: input.isOfficial ?? false,
+      officialId: input.isOfficial
+        ? input.officialId || `OFF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+        : input.officialId,
     });
     const saved = await this.resellers.save(reseller);
 
@@ -91,6 +97,8 @@ export class ResellersService {
       canAssignBadge: input.permissions?.canAssignBadge ?? false,
       canRemove: input.permissions?.canRemove ?? false,
       canSetExpiry: input.permissions?.canSetExpiry ?? false,
+      canViewSosAlerts: input.permissions?.canViewSosAlerts ?? false,
+      canViewComplaintEvidence: input.permissions?.canViewComplaintEvidence ?? false,
       dailyRechargeLimit: input.permissions?.dailyRechargeLimit,
       dailyFrameLimit: input.permissions?.dailyFrameLimit,
       dailyEntryLimit: input.permissions?.dailyEntryLimit,
@@ -178,7 +186,7 @@ export class ResellersService {
 
   async updateProfile(
     id: string,
-    patch: Partial<Pick<Reseller, 'displayName' | 'status' | 'email'>>,
+    patch: Partial<Pick<Reseller, 'displayName' | 'status' | 'email' | 'isOfficial' | 'officialId'>>,
     actor: JwtPayload,
     meta?: RequestMetaDto,
   ) {
@@ -556,6 +564,8 @@ export class ResellersService {
       creditLimit: reseller.creditLimit,
       commissionRate: Number(reseller.commissionRate),
       status: reseller.status,
+      isOfficial: reseller.isOfficial,
+      officialId: reseller.officialId ?? null,
       permissions: reseller.permissions
         ? {
             canRecharge: reseller.permissions.canRecharge,
@@ -564,6 +574,8 @@ export class ResellersService {
             canAssignBadge: reseller.permissions.canAssignBadge,
             canRemove: reseller.permissions.canRemove,
             canSetExpiry: reseller.permissions.canSetExpiry,
+            canViewSosAlerts: reseller.permissions.canViewSosAlerts,
+            canViewComplaintEvidence: reseller.permissions.canViewComplaintEvidence,
             dailyRechargeLimit: reseller.permissions.dailyRechargeLimit,
             dailyFrameLimit: reseller.permissions.dailyFrameLimit,
             dailyEntryLimit: reseller.permissions.dailyEntryLimit,

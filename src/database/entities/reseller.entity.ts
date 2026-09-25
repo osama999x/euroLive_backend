@@ -27,6 +27,12 @@ export class Reseller extends BaseEntity {
   @Column({ type: 'varchar', default: AccountStatus.ACTIVE })
   status: AccountStatus;
 
+  @Column({ default: false })
+  isOfficial: boolean;
+
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  officialId?: string;
+
   @OneToOne(() => ResellerPermissions, (permissions) => permissions.reseller)
   permissions?: ResellerPermissions;
 }

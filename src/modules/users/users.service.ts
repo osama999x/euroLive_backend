@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { AppException } from '../../common/exceptions';
 import { UserStatus, WalletOwnerType } from '../../common/enums';
 import { PaginationQueryDto, PaginatedResultDto } from '../../common/dto';
-import { generatePublicId, getPagination } from '../../common/utils';
+import { generatePublicId, getPagination, hashPassword } from '../../common/utils';
 import { User } from '../../database/entities';
 import { WalletService } from '../wallet/wallet.service';
 
@@ -16,6 +16,9 @@ export interface CreateUserInput {
   country?: string;
   gender?: string;
   bio?: string;
+  password?: string;
+  isOfficial?: boolean;
+  officialId?: string;
 }
 
 @Injectable()
@@ -35,7 +38,16 @@ export class UsersService {
     }
 
     const user = this.users.create({
-      ...input,
+      username: input.username,
+      displayName: input.displayName,
+      email: input.email,
+      phone: input.phone,
+      country: input.country,
+      gender: input.gender,
+      bio: input.bio,
+      isOfficial: input.isOfficial ?? false,
+      officialId: input.officialId,
+      passwordHash: input.password ? await hashPassword(input.password) : undefined,
       publicId: await this.uniquePublicId(),
       status: UserStatus.ACTIVE,
       deviceIds: [],
@@ -91,6 +103,43 @@ export class UsersService {
     if (user.status === UserStatus.BANNED) {
       throw new AppException('User is banned', HttpStatus.FORBIDDEN);
     }
+  }
+
+  async findByLogin(login: string): Promise<User | null> {
+    return this.users
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where(
+        'LOWER(user.email) = LOWER(:login) OR user.username = :login OR user.publicId = :login',
+        { login },
+      )
+      .getOne();
+  }
+
+  async setOfficial(id: string, isOfficial: boolean, officialId?: string): Promise<User> {
+    const user = await this.findById(id);
+    user.isOfficial = isOfficial;
+    user.officialId = isOfficial ? officialId || `OFF-${user.publicId}` : undefined;
+    return this.users.save(user);
+  }
+
+  toPublic(user: User, includePhone = false) {
+    return {
+      id: user.id,
+      publicId: user.publicId,
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName,
+      country: user.country,
+      gender: user.gender,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      status: user.status,
+      isOfficial: user.isOfficial,
+      officialId: user.officialId,
+      phone: includePhone ? user.phone : undefined,
+      createdAt: user.createdAt,
+    };
   }
 
   private async uniquePublicId(): Promise<string> {

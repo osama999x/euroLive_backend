@@ -2,7 +2,9 @@
 
 **Verified:** 17 Sep 2026 against `http://localhost:3000/api/v1` (51/51 portal endpoints passing).
 
-This document is for the **Master Admin portal** and **Reseller portal** only. Agency portal, Flutter consumer auth, live rooms, gifts, PK, withdrawals, and presence are **not shipped yet** — do not build UI against those.
+**Euro Live Core APIs** (hosts, agencies, rooms, salary hold/release, complaints, SOS, devices, fraud freeze, backups) are documented from **§11**. Flutter UI, live RTC, gifts, PK, presence, Section 16 media, and real-money bank payout rails are still out of scope.
+
+This document covers **Admin**, **Reseller**, **Agency**, **Host**, and **App** JSON APIs.
 
 Interactive explorer: `http://localhost:3000/api-docs` (HTTP Basic: `admin` / `admin123`).
 
@@ -21,6 +23,8 @@ Use **two separate frontend apps** (or two route trees) with two auth stores:
 |---|---|---|
 | Admin | `staff` | `kl_admin_access` / `kl_admin_refresh` |
 | Reseller | `reseller` | `kl_reseller_access` / `kl_reseller_refresh` |
+| Agency | `agency` | `kl_agency_access` / `kl_agency_refresh` |
+| App / Host | `user` | `kl_app_access` / `kl_app_refresh` |
 
 Do **not** reuse an admin token on reseller routes, or the reverse. Admin token on a reseller route → `403`. Missing token → `401`.
 
@@ -748,20 +752,143 @@ Commission adds `commissionRate` (percent) and `commission` (`floor(total * rate
 
 ---
 
-## 11. Out of scope (do not implement against this API yet)
+## 11. Euro Live Core APIs
 
-- Flutter app auth / OTP / profile
-- Agency portal
-- Live rooms, PK, gifts, chat, leaderboards
-- Host withdrawals
-- Push / broadcasts
-- Camera-presence admin rules
+Base path remains `/api/v1`. Envelope, JWT, and refresh (`POST /auth/refresh`) are unchanged. Host is a **user JWT** plus a `host_profiles` row — use `/host/...` after `POST /app/auth/login`.
 
-Socket.IO namespace `/live` currently only answers `ping` → `pong`. Do not wire gift/comment UI to it yet.
+### 11.1 Auth
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/app/auth/login` | public | `{ login, password, deviceId?, deviceName? }` — records device, emails on new device |
+| GET | `/app/auth/me` | user | Phone is omitted |
+| POST | `/agency/auth/login` | public | `{ login, password }` |
+| GET | `/agency/auth/me` | agency | |
+
+Seeded logins (local):
+
+| Account | Login | Password |
+|---|---|---|
+| Host PK 1 | `host_pk_1` | `Host@1234` |
+| Agency PK | `agency_pk` | `Agency@123` |
+| Demo user | `demo_user` | `Demo@1234` |
+
+### 11.2 Devices, freeze, Official
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET | `/app/me/devices` | user | |
+| POST | `/app/me/logout-all` | user | Revokes app sessions |
+| POST | `/app/me/freeze` | user | `{ reason }` — pending Master review |
+| GET | `/admin/freezes` | staff | |
+| POST | `/admin/freezes` | Master | `{ ownerType, ownerId, freezeType, reason }` |
+| POST | `/admin/freezes/:id/review` | Master | `{ action: restore\|confirm\|ban, note? }` |
+| PATCH | `/admin/users/:id/official` | Master | `{ isOfficial, officialId? }` — protected from host kick/blacklist |
+| POST | `/admin/resellers` | staff | Optional `isOfficial`, `officialId`, `canViewSosAlerts`, `canViewComplaintEvidence` |
+
+Audit rows now include `reason` and `caseNumber`. There is **no PATCH/DELETE** for audit.
+
+### 11.3 Agencies & hosts
+
+| Method | Path | Auth |
+|---|---|---|
+| POST/GET/PATCH | `/admin/agencies` | staff (freeze = Master) |
+| POST | `/admin/agencies/:id/freeze` | Master `{ reason }` |
+| POST/GET/PATCH | `/admin/hosts` | staff |
+| POST | `/admin/hosts/:id/protection-lock` | Master |
+| POST | `/admin/hosts/:id/protection-unlock` | Master |
+| POST | `/admin/hosts/:id/freeze` | Master |
+| GET | `/agency/dashboard` | agency — share totals only |
+| GET | `/agency/hosts` | agency — roster, no salary |
+| GET | `/agency/shares` | agency |
+
+Host Protection Lock: non-Master writes to host status/agency/salary hours return **403** and an audit `host.protection.blocked`.
+
+### 11.4 Rooms
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST/GET | `/host/rooms` | host | |
+| POST | `/host/rooms/:id/background` | host | `{ catalogItemId }` wallpaper catalog only |
+| POST/DELETE | `/host/rooms/:id/staff` | host | Mute-only room admins |
+| POST | `/host/rooms/:id/kick` | host | Blocked if target `isOfficial` |
+| POST/DELETE | `/host/rooms/:id/blacklist` | host | Same Official protection |
+| POST | `/app/rooms/:id/mute` | user | Room admin only |
+| GET | `/admin/rooms` | staff | |
+
+### 11.5 Complaints & SOS
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/app/reports` | user | `{ targetId, summary, evidence?: [{type,url}], protectionLock? }` |
+| POST/GET | `/host/complaints` | host | Evidence URLs stored; files stay private |
+| GET | `/admin/complaints` | staff | |
+| GET | `/admin/complaints/:id` | staff | Evidence **only for Master** |
+| POST | `/admin/complaints/:id/review` | Master | `{ action: confirm\|reject\|close, salaryDeduct?, note? }` — never auto-penalize |
+| POST/GET | `/host/sos` | host | Opens SOS + Host Protection Lock |
+| GET | `/admin/sos` | staff | Lazy-escalates overdue alerts |
+| POST | `/admin/sos/:id/ack` | staff | |
+| POST | `/admin/sos/:id/resolve` | Master | `{ outcome }` |
+| POST | `/reseller/sos/:id/ack` | reseller + `sos` flag | Assigned official/reseller |
+
+### 11.6 Salary (Master-only money movement)
+
+Country tables **PK / IN / BD** are seeded empty of rules — Admin fills targets.
+
+| Method | Path | Auth |
+|---|---|---|
+| GET/PATCH | `/admin/countries`, `/admin/countries/:code` | view staff / patch Master (`payoutHoldDays` default 3) |
+| GET/POST/PATCH | `/admin/salary-rules` | Master write |
+| POST/GET | `/admin/salary/periods` | Master write |
+| POST | `/admin/hosts/:id/hours` | staff `{ periodId, liveHours, liveDays, beans? }` |
+| POST | `/admin/payouts/calculate` | Master `{ periodId }` |
+| GET | `/admin/payouts`, `/admin/payouts/:id` | staff |
+| POST | `/admin/payouts/:id/approve-hold` | Master — locks amounts for `holdDays` |
+| POST | `/admin/payouts/:id/items/:itemId/correct` | Master `{ newAmount, reason }` |
+| POST | `/admin/payouts/:id/release` | Master — after `holdUntil`; credits `host_salary` + `agency` wallets via ledger |
+| POST | `/host/salary/pin` | host `{ pin, currentPin? }` |
+| POST | `/host/salary/view` | host `{ pin }` — hours, target, earned, bonus, deductions, hold, history |
+| POST | `/host/salary/pin/forgot` | host — email OTP |
+| POST | `/host/salary/pin/reset` | host `{ otp, pin }` |
+
+Ban does **not** auto-cut salary. Confirmed complaints with `salaryDeduct: true` (3+ in period) can zero bonus.
+
+Agency **cannot** read host salary detail.
+
+### 11.7 Fraud, backups, dashboards
+
+Coin writes still go only through `WalletService`. Impossible jump (≥100000) or large credit (≥50000) creates `account_freezes` + `fraud_cases` (temporary, not a ban).
+
+| Method | Path | Auth |
+|---|---|---|
+| GET | `/admin/fraud` | staff |
+| POST | `/admin/fraud/:id/review` | Master `{ action: restore\|correct\|penalty\|ban, amount?, note? }` |
+| GET/PATCH | `/admin/backups/settings` | disable requires Master `password` + optional `totp` + `reason` |
+| POST | `/admin/backups/run` | Master — JSON snapshot under `storage/backups/` |
+| GET | `/admin/backups` | staff |
+| GET | `/admin/dashboard` | extra: `pendingPayouts`, `openSos`, `openComplaints`, `frozenWallets`, `activeRooms` |
+| GET | `/host/dashboard` | host — no salary amounts until PIN view |
+
+Restore of backups is an ops runbook (Master, staging first), not a self-serve destroy endpoint.
+
+### 11.8 Pilot e2e
+
+`node scripts/euro-live-pilot.mjs` (API must be running): calculate → hold → correct → release (set `payoutHoldDays: 0`) → complaint → SOS → audit.
 
 ---
 
-## 12. Dev credentials
+## 12. Still out of scope
+
+- Flutter screens (salary biometric stays on device)
+- Live RTC, gifts, PK, presence
+- PDF §16 media/entertainment
+- Real-money bank payout rails
+
+Socket.IO namespace `/live` currently only answers `ping` → `pong`.
+
+---
+
+## 13. Dev credentials
 
 Seeded Super Admin (created on first boot from server env):
 
@@ -775,5 +902,14 @@ Seeded Super Admin (created on first boot from server env):
 Seeded consumer for reseller testing: publicId **`10000001`**.
 
 Create resellers via Admin UI / `POST /admin/resellers` — there is no seeded reseller login.
+
+Seeded Euro Live accounts (created on boot after the Euro Live migration):
+
+| Role | Login | Password |
+|---|---|---|
+| Agency PK | `agency_pk` | `Agency@123` |
+| Agency BD | `agency_bd` | `Agency@123` |
+| Host PK/IN/BD | `host_pk_1`, `host_pk_2`, `host_in_1`, `host_bd_1` | `Host@1234` |
+| Demo user | `demo_user` | `Demo@1234` |
 
 If these were rotated, ask backend for current `SEED_ADMIN_*` values. Do not commit production passwords into the frontend repo.

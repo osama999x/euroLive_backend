@@ -5,3 +5,5 @@ export * from './skip-transform.decorator';
 export * from './account-types.decorator';
 export * from './permissions.decorator';
 export * from './request-meta.decorator';
+export * from './host-route.decorator';
+export * from './current-host.decorator';

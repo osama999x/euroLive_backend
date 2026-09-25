@@ -48,6 +48,16 @@ export class ResellerPermissionsDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsBoolean()
+  canViewSosAlerts?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  canViewComplaintEvidence?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsInt()
   @Min(0)
   dailyRechargeLimit?: number;
@@ -109,6 +119,16 @@ export class CreateResellerDto {
   @Min(0)
   initialBalance?: number;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isOfficial?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  officialId?: string;
+
   @ApiPropertyOptional({ type: ResellerPermissionsDto })
   @IsOptional()
   @ValidateNested()
@@ -131,6 +151,16 @@ export class UpdateResellerDto {
   @IsOptional()
   @IsEnum(AccountStatus)
   status?: AccountStatus;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isOfficial?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  officialId?: string;
 }
 
 export class UpdateCreditLimitDto {

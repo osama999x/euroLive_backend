@@ -31,6 +31,12 @@ export class ResellerPermissions extends BaseEntity {
   @Column({ default: false })
   canSetExpiry: boolean;
 
+  @Column({ default: false })
+  canViewSosAlerts: boolean;
+
+  @Column({ default: false })
+  canViewComplaintEvidence: boolean;
+
   @Column({ type: 'int', nullable: true })
   dailyRechargeLimit?: number;
 
