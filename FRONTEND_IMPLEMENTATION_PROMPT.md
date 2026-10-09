@@ -46,7 +46,7 @@ These portal APIs shipped earlier and are still valid.
 
 ### Admin portal business
 - Dashboard `GET /admin/dashboard` (now also has Euro Live KPIs — see section B)
-- Users: `POST/GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/ban|unban`
+- Users: `POST/GET /admin/users`, `GET /admin/users/:id` (now includes `idBanned`, `idBannedUntil`, `liveBanned`, `liveBannedUntil`)
 - Catalog: `POST/GET/PATCH/DELETE /admin/catalog` types `frame|entry|badge` (**plus new `wallpaper`**)
 - Resellers: create/list/get/update, balance adjust, permissions, limits, credit-limit
 - Wallets: `POST /admin/wallets/adjust`
@@ -130,11 +130,28 @@ Host public object: `id, userId, agencyId, country, status, protectionLocked, pr
 - Create/update reseller: `isOfficial`, `officialId`; permissions `canViewSosAlerts`, `canViewComplaintEvidence` (default false)
 - Show public label **Official** + `officialId` on reseller and user where `isOfficial`
 
+### B6b. Admin — ID / device / live bans (replace Ban/Unban-only UI)
+Do **not** call `PATCH /admin/users/:id/ban` for the new Ban modal (legacy permanent ID only). Use:
+
+- `GET /admin/users/:id` → extra flags `idBanned`, `idBannedUntil`, `liveBanned`, `liveBannedUntil`
+- `GET /admin/users/:id/devices` → `{ id, deviceId, deviceName, lastSeenAt, isNew, banned, bannedUntil }[]`
+- `GET /admin/users/:id/bans` → history rows `{ id, userId, deviceId, type, reason, startsAt, expiresAt, revokedAt, createdById, createdAt }`
+- `POST /admin/users/:id/bans` `{ type: "id"|"device"|"live", duration: "1h"|"24h"|"7d"|"30d"|"permanent"|"custom", customHours?, reason?, deviceId?, includeDevices? }`
+  - `type=device` **requires** `deviceId` from the devices list
+  - `type=id` + `includeDevices: true` also bans every known device
+  - `duration=custom` **requires** `customHours` integer ≥ 1
+- `POST /admin/users/:id/bans/:banId/revoke` — lift one row
+- `PATCH /admin/users/:id/unban` — lift all **ID** bans (does not lift device/live)
+
+Effects: ID ban → login 403; device ban → that `deviceId` 403 even on another account; live ban → login OK, `POST /host/rooms` 403 and rooms closed. Staff who can write: `super_admin|admin|moderator` (support can list only).
+
+App/Host: `POST /app/auth/login` **must** send `deviceId`. `GET /app/auth/me` and `GET /host/dashboard` include the same ban flags. Hide/disable Go Live when `liveBanned`.
+
 ### B7. Host portal — rooms
 Requires host JWT (app login as `host_pk_*`).
 
-- `GET /host/dashboard` → `{ host, rooms }` (no salary money)
-- `POST /host/rooms` `{ title }`
+- `GET /host/dashboard` → `{ host, rooms, liveBanned, liveBannedUntil, idBanned, idBannedUntil }` (no salary money)
+- `POST /host/rooms` `{ title }` — **403** if live-banned (`"Live streaming is banned..."`)
 - `GET /host/rooms`
 - `POST /host/rooms/:id/background` `{ catalogItemId }` — catalog item **type must be `wallpaper`**
 - `POST /host/rooms/:id/staff` `{ userId }` — mute-only admin
@@ -278,12 +295,12 @@ No seeded reseller — create via Admin. Catalog includes wallpaper **Night Sky*
 
 ## F. What you should ship in the frontend (priority)
 
-1. **Admin:** extend dashboard KPIs; Agencies; Hosts + protection badge; Countries + salary rules + periods + hours; Payout list (calculate → hold countdown → correct → release); Complaints queue + Master evidence/review; SOS queue; Freezes + Fraud; Backups settings/run; Official toggle on users/resellers; wallpaper catalog type.
+1. **Admin:** extend dashboard KPIs; Agencies; Hosts + protection badge; Countries + salary rules + periods + hours; Payout list (calculate → hold countdown → correct → release); Complaints queue + Master evidence/review; SOS queue; Freezes + Fraud; Backups settings/run; Official toggle on users/resellers; wallpaper catalog type; **user Ban modal** with ID duration, device list, live-streaming ban.
 2. **Agency portal:** login, dashboard shares, host roster. Stop there.
 3. **Host (web or app shell):** login, dashboard, rooms (bg/kick/blacklist/staff), complaints, SOS, salary PIN + view + PIN reset OTP. Device list + freeze.
 4. **App user:** login, report center, mute if room admin, devices, freeze. No live room video.
 5. **Reseller:** add Official badge; SOS ack if flag on. Keep existing coin/catalog UI.
 
-Use existing Admin/Reseller screens as-is for auth, coins, catalog (non-wallpaper), users ban, staff RBAC.
+Use existing Admin/Reseller screens as-is for auth, coins, catalog (non-wallpaper), staff RBAC. Replace the user Ban/Unban buttons with ID / Device / Live duration bans (section B6b).
 
 If an endpoint 404s, it is not implemented — do not fake it.

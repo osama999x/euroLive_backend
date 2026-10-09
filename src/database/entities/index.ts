@@ -34,6 +34,7 @@ export * from './account-freeze.entity';
 export * from './fraud-case.entity';
 export * from './backup-settings.entity';
 export * from './backup-run.entity';
+export * from './user-ban.entity';
 
 import { StaffUser } from './staff-user.entity';
 import { Role } from './role.entity';
@@ -69,6 +70,7 @@ import { AccountFreeze } from './account-freeze.entity';
 import { FraudCase } from './fraud-case.entity';
 import { BackupSettings } from './backup-settings.entity';
 import { BackupRun } from './backup-run.entity';
+import { UserBan } from './user-ban.entity';
 
 export const ALL_ENTITIES = [
   StaffUser,
@@ -105,4 +107,5 @@ export const ALL_ENTITIES = [
   FraudCase,
   BackupSettings,
   BackupRun,
+  UserBan,
 ];

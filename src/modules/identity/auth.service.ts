@@ -22,6 +22,7 @@ import { RefreshToken, Reseller, StaffUser, User } from '../../database/entities
 import { TokenService } from '../../infrastructure/jwt/token.service';
 import { ResellersService } from '../resellers/resellers.service';
 import { UsersService } from '../users/users.service';
+import { BanService } from '../users/ban.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { DevicesService } from '../security/devices.service';
 import { FreezeService } from '../security/freeze.service';
@@ -44,6 +45,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly resellers: ResellersService,
     private readonly users: UsersService,
+    private readonly bans: BanService,
     private readonly agencies: AgenciesService,
     private readonly devices: DevicesService,
     private readonly freeze: FreezeService,
@@ -185,7 +187,7 @@ export class AuthService {
     if (!user || !user.passwordHash || !(await comparePassword(password, user.passwordHash))) {
       throw new AppException('Invalid credentials', HttpStatus.UNAUTHORIZED);
     }
-    await this.users.assertActive(user);
+    await this.bans.assertCanLogin(user, deviceId);
     await this.freeze.assertNotFrozen('user', user.id);
 
     await this.devices.recordLogin(user.id, deviceId, deviceName);
@@ -196,7 +198,7 @@ export class AuthService {
       accountType: AccountType.USER,
     };
     return {
-      user: this.users.toPublic(user),
+      user: await this.bans.decorate(user),
       ...(await this.issuePair(payload)),
     };
   }

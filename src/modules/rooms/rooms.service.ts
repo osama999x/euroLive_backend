@@ -21,6 +21,7 @@ import {
 } from '../../database/entities';
 import { AuditService } from '../audit/audit.service';
 import { UsersService } from '../users/users.service';
+import { BanService } from '../users/ban.service';
 import { JwtPayload } from '../../common/interfaces';
 import { RequestMetaDto } from '../../common/decorators';
 
@@ -40,10 +41,12 @@ export class RoomsService {
     @InjectRepository(User)
     private readonly users: Repository<User>,
     private readonly usersService: UsersService,
+    private readonly bans: BanService,
     private readonly audit: AuditService,
   ) {}
 
   async create(host: HostProfile, title: string) {
+    await this.bans.assertCanGoLive(host.userId);
     const room = await this.rooms.save(
       this.rooms.create({
         hostProfileId: host.id,

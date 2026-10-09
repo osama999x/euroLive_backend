@@ -99,6 +99,10 @@ export class UsersService {
     return this.users.save(user);
   }
 
+  async save(user: User): Promise<User> {
+    return this.users.save(user);
+  }
+
   async assertActive(user: User): Promise<void> {
     if (user.status === UserStatus.BANNED) {
       throw new AppException('User is banned', HttpStatus.FORBIDDEN);

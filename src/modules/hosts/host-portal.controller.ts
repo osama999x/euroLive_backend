@@ -24,6 +24,7 @@ import { RedisService } from '../../infrastructure/redis/redis.service';
 import { MailService } from '../../infrastructure/mail/mail.service';
 import { generateNumericOtp, hashToken } from '../../common/utils';
 import { UsersService } from '../users/users.service';
+import { BanService } from '../users/ban.service';
 import { ConfigService } from '@nestjs/config';
 import { Environment } from '../../common/enums';
 import { Logger } from '@nestjs/common';
@@ -47,6 +48,7 @@ export class HostPortalController {
     private readonly redis: RedisService,
     private readonly mail: MailService,
     private readonly users: UsersService,
+    private readonly bans: BanService,
     private readonly config: ConfigService,
   ) {}
 
@@ -54,9 +56,14 @@ export class HostPortalController {
   @ApiOperation({ summary: 'Host dashboard without salary amounts' })
   async dashboard(@CurrentHost() host: HostProfile) {
     const rooms = await this.rooms.listForHost(host.id);
+    const flags = host.user ? await this.bans.decorate(host.user) : null;
     return {
       host: this.hosts.toPublic(host),
       rooms,
+      liveBanned: flags?.liveBanned ?? false,
+      liveBannedUntil: flags?.liveBannedUntil ?? null,
+      idBanned: flags?.idBanned ?? false,
+      idBannedUntil: flags?.idBannedUntil ?? null,
     };
   }
 

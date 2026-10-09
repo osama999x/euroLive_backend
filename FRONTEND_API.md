@@ -341,9 +341,24 @@ All routes below require `Authorization: Bearer <staff accessToken>` unless mark
 |---|---|---|
 | POST | `/admin/users` | `{ username, displayName, email?, phone?, country? }` |
 | GET | `/admin/users` | `page`, `limit`, `search?`, `status?=active\|banned` |
-| GET | `/admin/users/:id` | UUID |
-| PATCH | `/admin/users/:id/ban` | empty |
-| PATCH | `/admin/users/:id/unban` | empty |
+| GET | `/admin/users/:id` | UUID — includes `idBanned`, `idBannedUntil`, `liveBanned`, `liveBannedUntil` |
+| GET | `/admin/users/:id/devices` | Devices seen for this user + `banned` / `bannedUntil` |
+| GET | `/admin/users/:id/bans` | ID / device / live ban history |
+| POST | `/admin/users/:id/bans` | `{ type, duration, customHours?, reason?, deviceId?, includeDevices? }` |
+| POST | `/admin/users/:id/bans/:banId/revoke` | empty — lift one ban row |
+| PATCH | `/admin/users/:id/ban` | empty — **legacy** permanent ID ban (prefer `POST .../bans`) |
+| PATCH | `/admin/users/:id/unban` | empty — lift **all active ID bans** |
+
+Ban `type`: `id` | `device` | `live`.  
+Ban `duration`: `1h` | `24h` | `7d` | `30d` | `permanent` | `custom` (`customHours` required, integer ≥ 1).  
+`deviceId` is **required** when `type=device`. `includeDevices: true` on an ID ban also bans every known device.
+
+Effects:
+- **ID ban** — `status` becomes `banned`; `POST /app/auth/login` returns **403**. Expires/revokes restore `active`.
+- **Device ban** — login with that `deviceId` is **403** even on a different account. Login still works from another device.
+- **Live ban** — login is allowed; `POST /host/rooms` is **403**. Open rooms are closed immediately.
+
+`GET /app/auth/me` and app login `user` include the same `idBanned*` / `liveBanned*` flags. `GET /host/dashboard` also returns `liveBanned`, `liveBannedUntil`, `idBanned`, `idBannedUntil`. App login must send `deviceId` or device bans cannot be enforced.
 
 Create response (inside `data`) — this is the object to show after “Create user”:
 
@@ -705,7 +720,7 @@ Commission adds `commissionRate` (percent) and `commission` (`floor(total * rate
 | Dashboard | `GET /admin/dashboard` |
 | Users list / search | `GET /admin/users` |
 | Create user | `POST /admin/users` |
-| User detail | `GET /admin/users/:id`, ban/unban, `POST /admin/wallets/adjust` |
+| User detail | `GET /admin/users/:id`, `GET .../devices`, `GET/POST .../bans`, revoke, `PATCH .../unban`, `POST /admin/wallets/adjust` |
 | Resellers list | `GET /admin/resellers` |
 | Create reseller | `POST /admin/resellers` |
 | Reseller detail | get + patch profile/permissions/limits/credit-limit/balance |
@@ -788,6 +803,18 @@ Seeded logins (local):
 
 Audit rows now include `reason` and `caseNumber`. There is **no PATCH/DELETE** for audit.
 
+### 11.2b User bans (ID / device / live)
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET | `/admin/users/:id/devices` | staff | `banned`, `bannedUntil` per device |
+| GET | `/admin/users/:id/bans` | staff | History; `type` = `id\|device\|live` |
+| POST | `/admin/users/:id/bans` | admin/moderator | `{ type, duration, customHours?, reason?, deviceId?, includeDevices? }` |
+| POST | `/admin/users/:id/bans/:banId/revoke` | admin/moderator | Lift one row |
+| PATCH | `/admin/users/:id/unban` | admin/moderator | Lift ID bans only |
+
+`GET /admin/users/:id`, `GET /app/auth/me`, app login `user`, and `GET /host/dashboard` include `idBanned`, `idBannedUntil`, `liveBanned`, `liveBannedUntil`. Live ban blocks `POST /host/rooms` (403) but not login.
+
 ### 11.3 Agencies & hosts
 
 | Method | Path | Auth |
@@ -808,7 +835,7 @@ Host Protection Lock: non-Master writes to host status/agency/salary hours retur
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST/GET | `/host/rooms` | host | |
+| POST/GET | `/host/rooms` | host | POST 403 if live-banned |
 | POST | `/host/rooms/:id/background` | host | `{ catalogItemId }` wallpaper catalog only |
 | POST/DELETE | `/host/rooms/:id/staff` | host | Mute-only room admins |
 | POST | `/host/rooms/:id/kick` | host | Blocked if target `isOfficial` |

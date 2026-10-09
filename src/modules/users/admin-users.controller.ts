@@ -19,9 +19,11 @@ import {
 import { AccountType, StaffRole } from '../../common/enums';
 import { JwtPayload } from '../../common/interfaces';
 import { UsersService } from './users.service';
+import { BanService } from './ban.service';
 import { CreateUserDto, OfficialUserDto } from './dto/create-user.dto';
+import { CreateBanDto } from './dto/ban.dto';
 import { UsersListQueryDto } from './dto/users-list-query.dto';
-import { ActorType } from '../../common/enums';
+import { ActorType, BanDuration, BanType } from '../../common/enums';
 import { AuditService } from '../audit/audit.service';
 
 @ApiTags('Admin Users')
@@ -31,6 +33,7 @@ import { AuditService } from '../audit/audit.service';
 export class AdminUsersController {
   constructor(
     private readonly users: UsersService,
+    private readonly bans: BanService,
     private readonly audit: AuditService,
   ) {}
 
@@ -65,51 +68,71 @@ export class AdminUsersController {
   @Get(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT, StaffRole.MODERATOR)
   get(@Param('id', ParseUUIDPipe) id: string) {
-    return this.users.findById(id);
+    return this.users.findById(id).then((user) => this.bans.decorate(user));
+  }
+
+  @Get(':id/devices')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'Devices seen for this user' })
+  devices(@Param('id', ParseUUIDPipe) id: string) {
+    return this.bans.listDevices(id);
+  }
+
+  @Get(':id/bans')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'ID / device / live ban history' })
+  bansList(@Param('id', ParseUUIDPipe) id: string) {
+    return this.bans.list(id);
+  }
+
+  @Post(':id/bans')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'Ban by ID, device, or live streaming, with duration' })
+  createBan(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateBanDto,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.bans.create(id, dto, actor, meta);
+  }
+
+  @Post(':id/bans/:banId/revoke')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
+  revokeBan(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('banId', ParseUUIDPipe) banId: string,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.bans.revoke(id, banId, actor, meta);
   }
 
   @Patch(':id/ban')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'Legacy permanent ID ban (prefer POST /bans)' })
   async ban(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() actor: JwtPayload,
     @RequestMeta() meta: RequestMetaDto,
   ) {
-    const before = await this.users.findById(id);
-    const user = await this.users.setBanned(id, true);
-    await this.audit.log({
-      actorType: ActorType.STAFF,
-      actorId: actor.sub,
-      action: 'user.ban',
-      targetType: 'user',
-      targetId: id,
-      before: { status: before.status },
-      after: { status: user.status },
+    return this.bans.create(
+      id,
+      { type: BanType.ID, duration: BanDuration.PERMANENT },
+      actor,
       meta,
-    });
-    return user;
+    );
   }
 
   @Patch(':id/unban')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
-  async unban(
+  @ApiOperation({ summary: 'Lift active ID bans' })
+  unban(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() actor: JwtPayload,
     @RequestMeta() meta: RequestMetaDto,
   ) {
-    const before = await this.users.findById(id);
-    const user = await this.users.setBanned(id, false);
-    await this.audit.log({
-      actorType: ActorType.STAFF,
-      actorId: actor.sub,
-      action: 'user.unban',
-      targetType: 'user',
-      targetId: id,
-      before: { status: before.status },
-      after: { status: user.status },
-      meta,
-    });
-    return user;
+    return this.bans.unbanId(id, actor, meta);
   }
 
   @Patch(':id/official')

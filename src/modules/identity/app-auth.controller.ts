@@ -5,6 +5,7 @@ import { AccountType } from '../../common/enums';
 import { JwtPayload } from '../../common/interfaces';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
+import { BanService } from '../users/ban.service';
 import { AppLoginDto } from '../agencies/dto/core.dto';
 
 @ApiTags('App Auth')
@@ -13,6 +14,7 @@ export class AppAuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly users: UsersService,
+    private readonly bans: BanService,
   ) {}
 
   @Public()
@@ -27,6 +29,6 @@ export class AppAuthController {
   @ApiBearerAuth()
   async me(@CurrentUser() user: JwtPayload) {
     const row = await this.users.findById(user.sub);
-    return this.users.toPublic(row);
+    return this.bans.decorate(row);
   }
 }

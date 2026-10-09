@@ -111,3 +111,18 @@ export enum CountryCode {
   IN = 'IN',
   BD = 'BD',
 }
+
+export enum BanType {
+  ID = 'id',
+  DEVICE = 'device',
+  LIVE = 'live',
+}
+
+export enum BanDuration {
+  HOURS_1 = '1h',
+  HOURS_24 = '24h',
+  DAYS_7 = '7d',
+  DAYS_30 = '30d',
+  PERMANENT = 'permanent',
+  CUSTOM = 'custom',
+}
