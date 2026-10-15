@@ -50,7 +50,7 @@ npm run start:dev
 | API | http://localhost:3000/api/v1 |
 | Health | http://localhost:3000/api/v1/health |
 | Ready | http://localhost:3000/api/v1/health/ready |
-| Swagger | http://localhost:3000/api-docs (`admin` / `admin123`) |
+| Swagger | http://localhost:3000/api/docs (`admin` / `admin123`) |
 | Socket.IO | `ws://localhost:3000/live` |
 
 `DB_SYNC=true` is for local development only. Use migrations in staging/production:

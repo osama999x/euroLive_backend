@@ -6,7 +6,7 @@
 
 This document covers **Admin**, **Reseller**, **Agency**, **Host**, and **App** JSON APIs.
 
-Interactive explorer: `http://localhost:3000/api-docs` (HTTP Basic: `admin` / `admin123`).
+Interactive explorer: `http://localhost:3000/api/docs` (HTTP Basic: `admin` / `admin123`). Also `/api-docs` and `/docs`.
 
 ---
 

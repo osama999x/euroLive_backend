@@ -1,6 +1,6 @@
 # Euro Live — Weekly Status Report
 
-**Period:** 29 September – 3 October 2026  
+**Period:** 6 – 9 October 2026  
 **Prepared for:** Client  
 **From:** Engineering  
 **Status:** On track  
@@ -9,9 +9,12 @@
 
 ## Headline
 
-Core operations are **live on the server**. Admin, Reseller, Agency, and Host can now run on real APIs: salary with a 3-day hold, complaints, SOS, rooms, and account security.
+This week we moved from “operations APIs exist” into **moderation tools and portal UX**.
 
-The next step is **portal screens** (what you click). Live video, gifts, and bank cash-out are **not started** — that is the phase after operations.
+- **Backend:** ID ban with duration, device ban, and live-streaming ban are live on the server.
+- **Frontend:** Reseller Assign items is clearer (Frames / Entries / Badges as separate sections). The Admin Ban screen is being wired to the new APIs.
+
+Live video, gifts, and bank cash-out remain a later phase.
 
 ---
 
@@ -19,83 +22,97 @@ The next step is **portal screens** (what you click). Live video, gifts, and ban
 
 | Question | Answer |
 |---|---|
-| Can we demo operations? | Yes — via APIs / Swagger. Portals are the next build. |
-| Is salary safe? | Yes. Server calculates, Master holds 3 days, then releases. Ledger + audit. Nobody can delete the log. |
-| Can Agency see host salary? | No. Agency sees share totals only. |
-| Can a host kick an Official? | No. Official IDs are protected. |
-| Is the live app ready? | No. Streaming, gifts, PK, and chat are a later phase. |
-| Overall vs full product | About **40%** of the full vision is on the server (operations). UI ~starting. Live + bank still ahead. |
+| What shipped this week? | Ban system on the server + Assign-items UX on the reseller portal. |
+| Can Admin ban by time? | Yes — 1 hour, 24 hours, 7 days, 30 days, permanent, or custom hours. |
+| Device ban? | Yes — that phone/device cannot log in, even on a new account. |
+| Live-streaming ban? | Yes — the host can still log in, but cannot go live. |
+| Did salary / SOS / complaints change? | No. Those remain as last week (server-side, ready for portal screens). |
+| Is the live app ready? | No. Streaming, gifts, PK, and chat are still later. |
 
 ---
 
-## What we completed
+## Backend (this week)
 
-### Already in place (earlier + this delivery)
-- Admin login, 2FA, email OTP forgot-password
-- Reseller login, OTP reset, coin transfer, frames / entries / badges
-- Users, catalog, staff roles, wallet ledger, audit log
+Completed and on the server:
 
-### Euro Live core (new)
-- Agencies (Pakistan, India, Bangladesh) and host accounts
-- Official / protected IDs
-- Rooms: host kick / blacklist, mute-only room admin, host background
-- Report Center + fair review (Master confirms; no auto-punish)
-- SOS: alert → ack → escalate if silent → Master resolve
-- Host Protection Lock (agency/reseller cannot change a locked host)
-- Salary: country rules → calculate → **3-day hold** → Master correct → release to host + agency wallets
-- Host salary page behind PIN (fingerprint stays on the phone only)
-- Devices, logout-all, self-freeze and Master freeze
-- Fraud freeze on unusual coin jumps + Master review
-- Backup settings and manual run (restore is operations, not a button)
+1. **ID ban with duration**  
+   Admin can ban an account for a set time. While banned, login is blocked. When the time ends, access returns automatically.
 
-**Pilot test (passed):** calculate → hold → correct → release → complaint → SOS → audit.
+2. **Device ban**  
+   Admin can ban a specific device from the user’s device list. That device is blocked even if the person creates another account. Other devices still work.
+
+3. **Live streaming ban**  
+   Admin can stop a host from going live without locking them out of the app. Any open room is closed. Login still works.
+
+Also in place from this work:
+- Ban history (who banned, until when, lift one ban or unban ID)
+- App/host responses now tell the UI if the user is ID-banned or live-banned, so Go Live can be disabled in the host app
+
+**Unchanged (already delivered last week):** Admin / Reseller / Agency / Host login, salary with 3-day hold, complaints, SOS, rooms, Official IDs, freeze, fraud review, backups.
 
 ---
 
-## How it flows (for the meeting)
+## Frontend (this week)
 
-**Master Admin** sees one dashboard (open SOS, complaints, pending payouts, frozen wallets). Sets country salary rules. Enters host hours. Calculates pay, holds 3 days, can correct with a reason, then releases. Reviews every complaint. Handles SOS and fraud. Only Master unlocks a protected host.
+### Done
+**Reseller — Assign items**  
+Frames, Entries, and Badges are **three separate sections**, not one screen with a Type dropdown. The reseller picks the item type they mean, then assigns. Backend already supported this; this was a portal UX change only.
 
-**Official / Reseller** sells coins and items. Officials have a public ID and cannot be kicked from a room. They can acknowledge SOS only if permitted. They do not see complaint files unless Master allows it.
+### In progress (APIs ready)
+**Admin — User Ban modal**  
+The old Ban / Unban buttons are being replaced with three actions matching the product:
 
-**Agency** logs in, sees their hosts and **agency share only**. No host PIN, no host salary line, no private evidence.
+- ID Ban + duration  
+- Device Ban (from the user’s device list)  
+- Live Streaming Ban + duration  
 
-**Host** opens a room, sets background, kicks/blacklists (except Officials), files complaints, hits SOS, and opens salary after PIN.
+Plus current-ban badges and a history list with Revoke.
 
-**User** can report, freeze their account, and manage devices. Room admin can mute only. No watch-live screen yet.
-
-**Salary in one line:** hours → country table → hold 3 days → Master release → balances update in-app. A ban does not cut salary. Only confirmed violations can cut bonus.
+Admin, Agency, and Host **operations screens** (payout queue, SOS board, agency roster, host salary PIN page) are still the next frontend block. They were not the focus of this week.
 
 ---
 
 ## This week vs next
 
-| Now (done) | Next 1–2 weeks | Later |
+| This week (done / in flight) | Next 1–2 weeks | Later |
 |---|---|---|
-| Core backend APIs | Admin portal screens (hosts, agencies, payout queue) | Live video / watch |
-| Salary hold & release | Agency portal (roster + shares) | Gifts, PK, chat |
-| SOS + complaints + rooms | Host shell (room, SOS, PIN salary) | Bank withdrawal |
-| Security, freeze, backup | Reseller Official badge + SOS ack | Push notifications |
+| Backend: ID / device / live bans | Finish Admin Ban modal | Live video / watch |
+| Frontend: Assign items (Frames / Entries / Badges) | Admin screens: hosts, agencies, payout queue | Gifts, PK, chat |
+| Frontend: Ban modal wiring started | Agency portal (roster + share only) | Bank withdrawal |
+| | Host shell: room, SOS, PIN salary | Push notifications |
+
+---
+
+## How it works (for the meeting)
+
+**ID ban:** user cannot log in until the timer ends (or Admin unbans).  
+**Device ban:** that device is blocked globally; a new account on the same phone still fails.  
+**Live ban:** host can open the app, but Go Live is refused until the timer ends.
+
+**Reseller assign:** three clear lists — Frames, Entries, Badges — assign from the matching list.
+
+Salary, SOS, and complaints flow is unchanged: Master holds pay 3 days, Agency never sees host salary, Officials cannot be kicked.
 
 ---
 
 ## Decision we need from you
 
-Please confirm the next sprint stays on **Admin + Agency + Host screens** (so you can click through operations), and **live streaming stays the sprint after**.
+Please confirm next sprint stays on **Admin + Agency + Host screens** (so you can click salary, SOS, and complaints), with **live streaming the sprint after**.
 
-If you want a live-watch prototype first, we should reset the order — that will delay the salary / SOS / agency demo.
+If you want a live-watch prototype first, we should reset the order — that will delay the operations demo.
 
 ---
 
 ## Risks (honest)
 
-- Portal UI is not finished; a non-technical demo today is Swagger / API, not a polished website.
-- Host hours are entered by Admin for now (not auto from a live session).
-- Evidence is a file URL, not an in-app camera upload yet.
+- Ban **server** is done; Ban **screen** is being finished on the portal this sprint.
+- Most Admin/Agency/Host operations screens are still not a polished click-through demo (APIs yes, UI next).
+- Host hours are still entered by Admin (not auto from a live session).
+- Evidence is a file URL, not an in-app camera upload.
 - App / Agency forgot-password is not built (Admin and Reseller already have OTP).
 
-None of these block the operations backend. They are UI and later-phase items.
+None of these block the ban APIs or the Assign-items UX.
 
 ---
 
-*Euro Live weekly status · 29 Sep – 3 Oct 2026 · Do not attach server passwords to this report.*
+*Euro Live weekly status · 6–9 Oct 2026 · Do not attach server passwords to this report.*

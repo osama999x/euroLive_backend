@@ -21,8 +21,15 @@ async function bootstrap() {
   const env = config.get<string>('app.env');
   const bodyLimit = config.get<string>('app.bodyLimit');
   const corsOrigin = config.get<string>('app.corsOrigin');
+  const swaggerEnabled =
+    config.get<boolean>('app.swaggerEnabled') && env !== Environment.Production;
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: swaggerEnabled ? false : undefined,
+      crossOriginEmbedderPolicy: swaggerEnabled ? false : undefined,
+    }),
+  );
   app.use(compression());
   app.use((req, res, next) => {
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
@@ -56,17 +63,14 @@ async function bootstrap() {
   await redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
 
-  const swaggerEnabled =
-    config.get<boolean>('app.swaggerEnabled') && env !== Environment.Production;
-
   if (swaggerEnabled) {
+    const swaggerUser = config.get<string>('app.swaggerUser');
+    const swaggerPassword = config.get<string>('app.swaggerPassword');
     app.use(
-      ['/api-docs', '/docs-json'],
+      ['/api/docs', '/api-docs', '/docs', '/api/docs-json', '/api-docs-json', '/docs-json'],
       basicAuth({
         challenge: true,
-        users: {
-          [config.get<string>('app.swaggerUser')]: config.get<string>('app.swaggerPassword'),
-        },
+        users: { [swaggerUser]: swaggerPassword },
       }),
     );
 
@@ -76,10 +80,15 @@ async function bootstrap() {
       .setVersion(config.get<string>('app.apiVersion'))
       .addBearerAuth()
       .addServer(`http://localhost:${port}`, 'Local')
+      // .addServer(`https://api.kingqueenlive.com`, 'Production')
+      .addServer(`http://92.205.16.74:3000`, 'Production')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('api-docs', app, document);
+    const swaggerOptions = { useGlobalPrefix: false };
+    SwaggerModule.setup('api/docs', app, document, swaggerOptions);
+    SwaggerModule.setup('api-docs', app, document, swaggerOptions);
+    SwaggerModule.setup('docs', app, document, swaggerOptions);
   }
 
   await app.listen(port);
@@ -87,7 +96,7 @@ async function bootstrap() {
   logger.log(`King Queen Live running on http://localhost:${port}/${apiPrefix}`);
   logger.log(`Environment: ${env}`);
   if (swaggerEnabled) {
-    logger.log(`Swagger: http://localhost:${port}/api-docs`);
+    logger.log(`Swagger: http://localhost:${port}/api/docs  (HTTP Basic ${config.get<string>('app.swaggerUser')})`);
   }
 }
 
