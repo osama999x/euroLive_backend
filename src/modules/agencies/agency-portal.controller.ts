@@ -42,6 +42,7 @@ export class AgencyPortalController {
   }
 
   @Get('shares')
+  @ApiOperation({ summary: 'Agency share totals (no host salary lines)' })
   shares(@CurrentUser() user: JwtPayload) {
     return this.salary.agencyShares(user.sub);
   }

@@ -37,7 +37,7 @@ export class AdminCatalogController {
   ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a frame, entry, or badge' })
+  @ApiOperation({ summary: 'Create a frame, entry, badge, or wallpaper' })
   async create(
     @Body() dto: CreateCatalogItemDto,
     @CurrentUser() actor: JwtPayload,
@@ -57,16 +57,19 @@ export class AdminCatalogController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List catalog items' })
   list(@Query() query: CatalogListQueryDto) {
     return this.catalog.list(query);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Catalog item detail' })
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.catalog.findById(id);
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a catalog item' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCatalogItemDto,
@@ -89,6 +92,7 @@ export class AdminCatalogController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a catalog item' })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() actor: JwtPayload,

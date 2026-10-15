@@ -19,7 +19,11 @@ export class AppAuthController {
 
   @Public()
   @Post('login')
-  @ApiOperation({ summary: 'Consumer / host login' })
+  @ApiOperation({
+    summary: 'Consumer / host login',
+    description:
+      'Returns accessToken + refreshToken and user flags idBanned / liveBanned. Always send deviceId so device bans can be enforced.',
+  })
   login(@Body() dto: AppLoginDto) {
     return this.auth.loginUser(dto.login, dto.password, dto.deviceId, dto.deviceName);
   }
@@ -27,6 +31,7 @@ export class AppAuthController {
   @Get('me')
   @AccountTypes(AccountType.USER)
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Current app user (includes idBanned / liveBanned)' })
   async me(@CurrentUser() user: JwtPayload) {
     const row = await this.users.findById(user.sub);
     return this.bans.decorate(row);

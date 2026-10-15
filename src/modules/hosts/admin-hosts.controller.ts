@@ -40,18 +40,21 @@ export class AdminHostsController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE, StaffRole.SUPPORT)
+  @ApiOperation({ summary: 'List hosts' })
   list(@Query() query: HostListQueryDto) {
     return this.hosts.list(query);
   }
 
   @Get(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE, StaffRole.SUPPORT)
+  @ApiOperation({ summary: 'Host detail' })
   async get(@Param('id', ParseUUIDPipe) id: string) {
     return this.hosts.toPublic(await this.hosts.findById(id));
   }
 
   @Patch(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Update host agency, country, or status' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateHostDto,
@@ -63,6 +66,7 @@ export class AdminHostsController {
 
   @Post(':id/protection-lock')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Master Host Protection Lock' })
   lock(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ProtectionLockDto,
@@ -79,6 +83,7 @@ export class AdminHostsController {
 
   @Post(':id/protection-unlock')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Master unlock Host Protection' })
   unlock(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() actor: JwtPayload,
@@ -89,6 +94,7 @@ export class AdminHostsController {
 
   @Post(':id/freeze')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Master freeze a host' })
   freeze(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: FreezeReasonDto,

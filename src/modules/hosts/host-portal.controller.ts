@@ -68,16 +68,19 @@ export class HostPortalController {
   }
 
   @Post('rooms')
+  @ApiOperation({ summary: 'Go live / create a room (403 if live-banned)' })
   createRoom(@CurrentHost() host: HostProfile, @Body() dto: CreateRoomDto) {
     return this.rooms.create(host, dto.title);
   }
 
   @Get('rooms')
+  @ApiOperation({ summary: 'List this host\'s rooms' })
   listRooms(@CurrentHost() host: HostProfile) {
     return this.rooms.listForHost(host.id);
   }
 
   @Post('rooms/:id/background')
+  @ApiOperation({ summary: 'Set room wallpaper from catalog type wallpaper' })
   background(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentHost() host: HostProfile,
@@ -88,6 +91,7 @@ export class HostPortalController {
   }
 
   @Post('rooms/:id/staff')
+  @ApiOperation({ summary: 'Add mute-only room admin' })
   addStaff(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentHost() host: HostProfile,
@@ -98,6 +102,7 @@ export class HostPortalController {
   }
 
   @Delete('rooms/:id/staff/:userId')
+  @ApiOperation({ summary: 'Remove a room admin' })
   removeStaff(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -108,6 +113,7 @@ export class HostPortalController {
   }
 
   @Post('rooms/:id/kick')
+  @ApiOperation({ summary: 'Kick a user (403 if target is Official)' })
   kick(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentHost() host: HostProfile,
@@ -118,6 +124,7 @@ export class HostPortalController {
   }
 
   @Post('rooms/:id/blacklist')
+  @ApiOperation({ summary: 'Blacklist a user (403 if target is Official)' })
   blacklist(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentHost() host: HostProfile,
@@ -128,6 +135,7 @@ export class HostPortalController {
   }
 
   @Delete('rooms/:id/blacklist/:userId')
+  @ApiOperation({ summary: 'Remove a user from room blacklist' })
   unblacklist(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -138,6 +146,7 @@ export class HostPortalController {
   }
 
   @Post('complaints')
+  @ApiOperation({ summary: 'Host files a complaint / report' })
   createComplaint(
     @CurrentHost() host: HostProfile,
     @Body() dto: CreateReportDto,
@@ -156,21 +165,25 @@ export class HostPortalController {
   }
 
   @Get('complaints')
+  @ApiOperation({ summary: 'Host complaint list' })
   listComplaints(@CurrentHost() host: HostProfile) {
     return this.complaints.listForHost(host);
   }
 
   @Post('sos')
+  @ApiOperation({ summary: 'Raise SOS (also turns on Host Protection Lock)' })
   sosCreate(@CurrentHost() host: HostProfile, @Body() dto: CreateSosDto) {
     return this.sos.create(host, dto);
   }
 
   @Get('sos')
+  @ApiOperation({ summary: 'Host SOS list with trail' })
   sosList(@CurrentUser() user: JwtPayload) {
     return this.sos.listForHost(user.sub);
   }
 
   @Post('salary/pin')
+  @ApiOperation({ summary: 'Set or change salary PIN (first set needs no currentPin)' })
   setPin(@CurrentHost() host: HostProfile, @Body() dto: SalaryPinDto) {
     return this.hosts.setSalaryPin(host.id, dto.pin, dto.currentPin);
   }
@@ -183,6 +196,7 @@ export class HostPortalController {
   }
 
   @Post('salary/pin/forgot')
+  @ApiOperation({ summary: 'Email OTP to reset salary PIN' })
   async forgotPin(@CurrentHost() host: HostProfile) {
     const user = await this.users.findById(host.userId);
     if (!user.email) {
@@ -213,6 +227,7 @@ export class HostPortalController {
   }
 
   @Post('salary/pin/reset')
+  @ApiOperation({ summary: 'Reset salary PIN with email OTP' })
   async resetPin(@CurrentHost() host: HostProfile, @Body() dto: ResetPinDto) {
     const user = await this.users.findById(host.userId);
     const key = `salary-pin:${(user.email ?? '').toLowerCase()}`;

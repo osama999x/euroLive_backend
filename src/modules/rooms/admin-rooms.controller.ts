@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AccountTypes, Roles } from '../../common/decorators';
 import { AccountType, StaffRole } from '../../common/enums';
 import { PaginationQueryDto } from '../../common/dto';
@@ -14,6 +14,7 @@ export class AdminRoomsController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'List rooms' })
   list(@Query() query: PaginationQueryDto) {
     return this.rooms.adminList(query);
   }

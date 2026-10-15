@@ -16,6 +16,7 @@ export class AdminFraudController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Fraud case queue' })
   list(@Query() query: PaginationQueryDto) {
     return this.fraud.list(query);
   }

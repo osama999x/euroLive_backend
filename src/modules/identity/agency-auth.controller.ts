@@ -25,6 +25,7 @@ export class AgencyAuthController {
   @Get('me')
   @AccountTypes(AccountType.AGENCY)
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Current agency session' })
   async me(@CurrentUser() user: JwtPayload) {
     const row = await this.agencies.findById(user.sub);
     return this.agencies.toPublic(row);

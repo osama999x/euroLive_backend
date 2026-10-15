@@ -61,6 +61,7 @@ export class ResellerAuthController {
   @ApiBearerAuth()
   @AccountTypes(AccountType.RESELLER)
   @Get('me')
+  @ApiOperation({ summary: 'Current reseller session' })
   me(@CurrentUser() user: JwtPayload) {
     return this.resellers.findById(user.sub).then((row) => this.resellers.toPublic(row));
   }

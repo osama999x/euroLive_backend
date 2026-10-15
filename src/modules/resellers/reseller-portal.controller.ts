@@ -78,6 +78,7 @@ export class ResellerPortalController {
 
   @Post('frames/assign')
   @RequirePermissions(ResellerPermissionFlag.FRAME)
+  @ApiOperation({ summary: 'Assign a frame to a user by publicId' })
   assignFrame(
     @CurrentUser() user: JwtPayload,
     @Body() dto: AssignItemDto,
@@ -94,6 +95,7 @@ export class ResellerPortalController {
 
   @Post('entries/assign')
   @RequirePermissions(ResellerPermissionFlag.ENTRY)
+  @ApiOperation({ summary: 'Assign an entry effect to a user by publicId' })
   assignEntry(
     @CurrentUser() user: JwtPayload,
     @Body() dto: AssignItemDto,
@@ -110,6 +112,7 @@ export class ResellerPortalController {
 
   @Post('badges/assign')
   @RequirePermissions(ResellerPermissionFlag.BADGE)
+  @ApiOperation({ summary: 'Assign a badge to a user by publicId' })
   assignBadge(
     @CurrentUser() user: JwtPayload,
     @Body() dto: AssignItemDto,
@@ -126,6 +129,7 @@ export class ResellerPortalController {
 
   @Delete('items/:id')
   @RequirePermissions(ResellerPermissionFlag.REMOVE)
+  @ApiOperation({ summary: 'Remove an assigned catalog item' })
   removeItem(
     @CurrentUser() user: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -135,11 +139,13 @@ export class ResellerPortalController {
   }
 
   @Get('transactions')
+  @ApiOperation({ summary: 'Reseller coin/item transaction history' })
   transactions(@CurrentUser() user: JwtPayload, @Query() query: PaginationQueryDto) {
     return this.resellers.transactions(user.sub, query);
   }
 
   @Get('reports/sales')
+  @ApiOperation({ summary: 'Sales report' })
   sales(@CurrentUser() user: JwtPayload, @Query() query: ReportRangeQueryDto) {
     return this.resellers.salesReport(
       user.sub,
@@ -149,6 +155,7 @@ export class ResellerPortalController {
   }
 
   @Get('reports/commission')
+  @ApiOperation({ summary: 'Commission report' })
   commission(@CurrentUser() user: JwtPayload, @Query() query: ReportRangeQueryDto) {
     return this.resellers.commissionReport(
       user.sub,

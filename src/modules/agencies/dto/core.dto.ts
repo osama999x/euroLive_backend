@@ -142,22 +142,22 @@ export class ProtectionLockDto {
 }
 
 export class AppLoginDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'host_pk_1', description: 'email, username, or publicId' })
   @IsString()
   @IsNotEmpty()
   login: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Host@1234' })
   @IsString()
   @MinLength(8)
   password: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'device-android-1', description: 'Required for device bans to apply' })
   @IsOptional()
   @IsString()
   deviceId?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Pixel 8' })
   @IsOptional()
   @IsString()
   deviceName?: string;

@@ -49,18 +49,21 @@ export class AdminResellersController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'List resellers' })
   list(@Query() query: ResellersListQueryDto) {
     return this.resellers.list(query);
   }
 
   @Get(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'Reseller detail' })
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.resellers.findById(id).then((row) => this.resellers.toPublic(row));
   }
 
   @Patch(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Update reseller profile / Official flag' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateResellerDto,
@@ -72,6 +75,7 @@ export class AdminResellersController {
 
   @Patch(':id/balance')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'Credit or debit reseller coin balance' })
   adjustBalance(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdjustBalanceDto,
@@ -91,6 +95,7 @@ export class AdminResellersController {
 
   @Patch(':id/permissions')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Update reseller permission flags' })
   permissions(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ResellerPermissionsDto,
@@ -102,6 +107,7 @@ export class AdminResellersController {
 
   @Patch(':id/limits')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Update daily recharge / item limits' })
   limits(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ResellerPermissionsDto,
@@ -123,6 +129,7 @@ export class AdminResellersController {
 
   @Patch(':id/credit-limit')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'Update reseller credit limit' })
   creditLimit(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCreditLimitDto,

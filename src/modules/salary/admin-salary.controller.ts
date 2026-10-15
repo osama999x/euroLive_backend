@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AccountTypes, CurrentUser, RequestMeta, RequestMetaDto, Roles } from '../../common/decorators';
 import { AccountType, StaffRole } from '../../common/enums';
 import { PaginationQueryDto } from '../../common/dto';
@@ -23,12 +23,14 @@ export class AdminSalaryController {
 
   @Get('countries')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'List country salary settings (PK / IN / BD)' })
   countries() {
     return this.salary.listCountries();
   }
 
   @Patch('countries/:code')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update country name, currency, payout hold days' })
   updateCountry(
     @Param('code') code: string,
     @Body() dto: UpdateCountryDto,
@@ -40,12 +42,15 @@ export class AdminSalaryController {
 
   @Get('salary-rules')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'List salary target rules' })
+  @ApiQuery({ name: 'countryCode', required: false })
   rules(@Query('countryCode') countryCode?: string) {
     return this.salary.listRules(countryCode);
   }
 
   @Post('salary-rules')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Create a country salary rule' })
   createRule(
     @Body() dto: CreateSalaryRuleDto,
     @CurrentUser() actor: JwtPayload,
@@ -56,6 +61,7 @@ export class AdminSalaryController {
 
   @Patch('salary-rules/:id')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update a salary rule' })
   updateRule(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: Partial<CreateSalaryRuleDto>,
@@ -67,18 +73,21 @@ export class AdminSalaryController {
 
   @Post('salary/periods')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Create a salary period' })
   period(@Body() dto: CreatePeriodDto, @CurrentUser() actor: JwtPayload) {
     return this.salary.createPeriod(dto, actor);
   }
 
   @Get('salary/periods')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'List salary periods' })
   periods() {
     return this.salary.listPeriods();
   }
 
   @Post('hosts/:id/hours')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Record host live hours/days/beans for a period' })
   hours(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RecordHoursDto,
@@ -101,18 +110,21 @@ export class AdminSalaryController {
 
   @Get('payouts')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'List payout batches' })
   list(@Query() query: PaginationQueryDto) {
     return this.salary.listBatches(query);
   }
 
   @Get('payouts/:id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'Payout batch detail with host lines' })
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.salary.getBatch(id);
   }
 
   @Post('payouts/:id/approve-hold')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Start 3-day salary hold' })
   hold(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() actor: JwtPayload,
@@ -123,6 +135,7 @@ export class AdminSalaryController {
 
   @Post('payouts/:id/items/:itemId/correct')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Master correct a host line before release' })
   correct(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,

@@ -28,18 +28,21 @@ export class AdminRolesController {
 
   @Get('permissions')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List permission catalog' })
   permissions() {
     return this.rbac.listPermissions();
   }
 
   @Get('staff')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List staff accounts' })
   staff() {
     return this.rbac.listStaff();
   }
 
   @Post('staff')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Create a staff account' })
   createStaff(
     @Body() dto: CreateStaffDto,
     @CurrentUser() actor: JwtPayload,
@@ -50,6 +53,7 @@ export class AdminRolesController {
 
   @Patch('staff/:id/roles')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Assign roles to a staff account' })
   assignRoles(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AssignRolesDto,

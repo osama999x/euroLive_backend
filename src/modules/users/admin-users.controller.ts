@@ -67,6 +67,7 @@ export class AdminUsersController {
 
   @Get(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'User detail with idBanned / liveBanned flags' })
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.users.findById(id).then((user) => this.bans.decorate(user));
   }
@@ -99,6 +100,7 @@ export class AdminUsersController {
 
   @Post(':id/bans/:banId/revoke')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'Lift one ID, device, or live ban row' })
   revokeBan(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('banId', ParseUUIDPipe) banId: string,

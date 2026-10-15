@@ -16,12 +16,14 @@ export class AdminComplaintsController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'Complaint / report queue' })
   list(@Query() query: PaginationQueryDto) {
     return this.complaints.list(query);
   }
 
   @Get(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT)
+  @ApiOperation({ summary: 'Complaint detail (evidence for Master)' })
   get(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: JwtPayload) {
     return this.complaints.getById(id, this.complaints.isMaster(actor));
   }

@@ -16,12 +16,14 @@ export class AdminSosController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT)
+  @ApiOperation({ summary: 'SOS queue' })
   list(@Query() query: PaginationQueryDto) {
     return this.sos.list(query);
   }
 
   @Post(':id/ack')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT)
+  @ApiOperation({ summary: 'Acknowledge an SOS' })
   ack(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() actor: JwtPayload,

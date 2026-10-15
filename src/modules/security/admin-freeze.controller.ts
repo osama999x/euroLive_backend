@@ -49,6 +49,7 @@ export class AdminFreezeController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'List freezes' })
   list(@Query() query: FreezeListQueryDto) {
     return this.freeze.list(query);
   }

@@ -16,6 +16,7 @@ export class AdminBackupsController {
 
   @Get('settings')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Backup schedule settings' })
   settings() {
     return this.backups.getSettings();
   }
@@ -33,12 +34,14 @@ export class AdminBackupsController {
 
   @Post('run')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Run a manual backup' })
   run(@CurrentUser() actor: JwtPayload, @RequestMeta() meta: RequestMetaDto) {
     return this.backups.run(actor, true, meta);
   }
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Backup run history' })
   list(@Query() query: PaginationQueryDto) {
     return this.backups.list(query);
   }

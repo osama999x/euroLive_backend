@@ -72,6 +72,7 @@ export class AdminAuthController {
   @ApiBearerAuth()
   @AccountTypes(AccountType.STAFF)
   @Get('me')
+  @ApiOperation({ summary: 'Current staff session' })
   me(@CurrentUser() user: JwtPayload) {
     return this.auth.getStaffMe(user.sub);
   }
@@ -79,6 +80,7 @@ export class AdminAuthController {
   @ApiBearerAuth()
   @AccountTypes(AccountType.STAFF)
   @Post('2fa/setup')
+  @ApiOperation({ summary: 'Begin TOTP 2FA setup (returns secret + otpauth URL)' })
   setup2fa(@CurrentUser() user: JwtPayload) {
     return this.auth.setup2fa(user.sub);
   }
@@ -86,6 +88,7 @@ export class AdminAuthController {
   @ApiBearerAuth()
   @AccountTypes(AccountType.STAFF)
   @Post('2fa/enable')
+  @ApiOperation({ summary: 'Enable 2FA with authenticator code' })
   enable2fa(@CurrentUser() user: JwtPayload, @Body() dto: TotpCodeDto) {
     return this.auth.enable2fa(user.sub, dto.code);
   }
@@ -93,6 +96,7 @@ export class AdminAuthController {
   @ApiBearerAuth()
   @AccountTypes(AccountType.STAFF)
   @Post('2fa/disable')
+  @ApiOperation({ summary: 'Disable 2FA with authenticator code' })
   disable2fa(@CurrentUser() user: JwtPayload, @Body() dto: TotpCodeDto) {
     return this.auth.disable2fa(user.sub, dto.code);
   }

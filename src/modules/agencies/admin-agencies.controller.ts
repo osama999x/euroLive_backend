@@ -40,18 +40,21 @@ export class AdminAgenciesController {
 
   @Get()
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'List agencies' })
   list(@Query() query: AgencyListQueryDto) {
     return this.agencies.list(query);
   }
 
   @Get(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE)
+  @ApiOperation({ summary: 'Agency detail' })
   async get(@Param('id', ParseUUIDPipe) id: string) {
     return this.agencies.toPublic(await this.agencies.findById(id));
   }
 
   @Patch(':id')
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Update agency profile / status / share percent' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAgencyDto,
@@ -63,6 +66,7 @@ export class AdminAgenciesController {
 
   @Post(':id/freeze')
   @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Master freeze an agency' })
   freeze(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: FreezeReasonDto,
