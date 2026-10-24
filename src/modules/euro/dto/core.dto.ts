@@ -43,6 +43,13 @@ export class RoomUserDto {
   reason?: string;
 }
 
+export class BlockUserDto {
+  @ApiProperty({ description: 'User UUID or public ID' })
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+}
+
 export class EvidenceDto {
   @ApiProperty({ enum: EvidenceType })
   @IsEnum(EvidenceType)

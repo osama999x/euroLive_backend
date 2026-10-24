@@ -839,7 +839,7 @@ Host Protection Lock: non-Master writes to host status/agency/salary hours retur
 | POST | `/host/rooms/:id/background` | host | `{ catalogItemId }` wallpaper catalog only |
 | POST/DELETE | `/host/rooms/:id/staff` | host | Mute-only room admins |
 | POST | `/host/rooms/:id/kick` | host | Blocked if target `isOfficial` |
-| POST/DELETE | `/host/rooms/:id/blacklist` | host | Same Official protection |
+| GET/POST/DELETE | `/host/rooms/:id/blacklist` | host | One tap blocks by user id or public ID. 403 for Official accounts and for blocking yourself. Blocked users cannot be added as staff or mute. |
 | POST | `/app/rooms/:id/mute` | user | Room admin only |
 | GET | `/admin/rooms` | staff | |
 

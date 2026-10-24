@@ -109,7 +109,8 @@ export class RoomsService {
 
   async addStaff(roomId: string, host: HostProfile, userId: string, actor: JwtPayload) {
     const room = await this.assertHostOwns(roomId, host);
-    await this.usersService.findById(userId);
+    const user = await this.usersService.findById(userId);
+    await this.assertNotBlacklisted(room.id, user.id);
     const existing = await this.staff.findOne({ where: { roomId: room.id, userId } });
     if (existing) {
       return existing;
@@ -149,47 +150,67 @@ export class RoomsService {
     return { kicked: true };
   }
 
+  async listBlacklist(roomId: string, host: HostProfile) {
+    const room = await this.assertHostOwns(roomId, host);
+    const rows = await this.blacklists.find({
+      where: { roomId: room.id },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+    });
+    return rows.map((row) => this.toBlocked(row));
+  }
+
   async blacklist(
     roomId: string,
     host: HostProfile,
-    targetUserId: string,
+    targetKey: string,
     reason: string,
     actor: JwtPayload,
   ) {
     const room = await this.assertHostOwns(roomId, host);
-    await this.assertNotOfficial(targetUserId);
-    const existing = await this.blacklists.findOne({ where: { roomId: room.id, userId: targetUserId } });
-    if (!existing) {
-      await this.blacklists.save(
-        this.blacklists.create({
-          roomId: room.id,
-          userId: targetUserId,
-          createdByUserId: actor.sub,
-          reason,
-        }),
-      );
+    const target = await this.resolveUser(targetKey);
+    if (target.id === host.userId) {
+      throw new AppException('You cannot block yourself', HttpStatus.BAD_REQUEST);
     }
+    this.assertNotOfficialUser(target);
+    const existing = await this.blacklists.findOne({
+      where: { roomId: room.id, userId: target.id },
+      relations: ['user'],
+    });
+    if (existing) {
+      return { ...this.toBlocked(existing), blacklisted: true, alreadyBlocked: true };
+    }
+    const saved = await this.blacklists.save(
+      this.blacklists.create({
+        roomId: room.id,
+        userId: target.id,
+        createdByUserId: actor.sub,
+        reason: reason || 'block',
+      }),
+    );
+    saved.user = target;
     await this.recordModeration(
       room.id,
       actor.sub,
-      targetUserId,
+      target.id,
       RoomModerationAction.BLACKLIST,
-      reason,
+      reason || 'block',
     );
-    return { blacklisted: true };
+    return { ...this.toBlocked(saved), blacklisted: true, alreadyBlocked: false };
   }
 
-  async unblacklist(roomId: string, host: HostProfile, targetUserId: string, actor: JwtPayload) {
+  async unblacklist(roomId: string, host: HostProfile, targetKey: string, actor: JwtPayload) {
     const room = await this.assertHostOwns(roomId, host);
-    await this.blacklists.delete({ roomId: room.id, userId: targetUserId });
+    const target = await this.resolveUser(targetKey);
+    await this.blacklists.delete({ roomId: room.id, userId: target.id });
     await this.recordModeration(
       room.id,
       actor.sub,
-      targetUserId,
+      target.id,
       RoomModerationAction.UNBLACKLIST,
       'removed',
     );
-    return { removed: true };
+    return { removed: true, userId: target.id };
   }
 
   async mute(
@@ -210,6 +231,8 @@ export class RoomsService {
     } else if (room.host.userId !== actorUserId) {
       throw new AppException('Only the host can mute as host', HttpStatus.FORBIDDEN);
     }
+    await this.assertNotBlacklisted(room.id, actorUserId);
+    await this.assertNotBlacklisted(room.id, targetUserId);
     await this.recordModeration(
       room.id,
       actorUserId,
@@ -237,9 +260,43 @@ export class RoomsService {
     if (!user) {
       throw new AppException('User not found', HttpStatus.NOT_FOUND);
     }
+    this.assertNotOfficialUser(user);
+  }
+
+  private assertNotOfficialUser(user: User) {
     if (user.isOfficial) {
       throw new AppException('Protected Official cannot be kicked or blacklisted', HttpStatus.FORBIDDEN);
     }
+  }
+
+  private async assertNotBlacklisted(roomId: string, userId: string) {
+    const row = await this.blacklists.findOne({ where: { roomId, userId } });
+    if (row) {
+      throw new AppException('User is blocked from this room', HttpStatus.FORBIDDEN);
+    }
+  }
+
+  private async resolveUser(idOrPublicId: string): Promise<User> {
+    const key = idOrPublicId.trim();
+    if (!key) {
+      throw new AppException('User ID is required', HttpStatus.BAD_REQUEST);
+    }
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
+      return this.usersService.findById(key);
+    }
+    return this.usersService.findByPublicId(key);
+  }
+
+  private toBlocked(row: RoomBlacklist) {
+    return {
+      id: row.id,
+      userId: row.userId,
+      publicId: row.user?.publicId ?? '',
+      username: row.user?.username ?? '',
+      displayName: row.user?.displayName ?? '',
+      isOfficial: Boolean(row.user?.isOfficial),
+      createdAt: row.createdAt,
+    };
   }
 
   private async recordModeration(

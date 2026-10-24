@@ -12,6 +12,7 @@ import { SosService } from '../sos/sos.service';
 import { SalaryService } from '../salary/salary.service';
 import {
   CreateReportDto,
+  BlockUserDto,
   CreateRoomDto,
   CreateSosDto,
   ResetPinDto,
@@ -123,22 +124,31 @@ export class HostPortalController {
     return this.rooms.kick(id, host, dto.userId, dto.reason ?? 'kick', actor);
   }
 
+  @Get('rooms/:id/blacklist')
+  @ApiOperation({ summary: 'Room block list' })
+  listBlacklist(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentHost() host: HostProfile,
+  ) {
+    return this.rooms.listBlacklist(id, host);
+  }
+
   @Post('rooms/:id/blacklist')
-  @ApiOperation({ summary: 'Blacklist a user (403 if target is Official)' })
+  @ApiOperation({ summary: 'Block a user by id or public ID (403 if target is Official)' })
   blacklist(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentHost() host: HostProfile,
     @CurrentUser() actor: JwtPayload,
-    @Body() dto: RoomUserDto,
+    @Body() dto: BlockUserDto,
   ) {
-    return this.rooms.blacklist(id, host, dto.userId, dto.reason ?? 'blacklist', actor);
+    return this.rooms.blacklist(id, host, dto.userId, 'block', actor);
   }
 
   @Delete('rooms/:id/blacklist/:userId')
-  @ApiOperation({ summary: 'Remove a user from room blacklist' })
+  @ApiOperation({ summary: 'Remove a user from the room block list' })
   unblacklist(
     @Param('id', ParseUUIDPipe) id: string,
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('userId') userId: string,
     @CurrentHost() host: HostProfile,
     @CurrentUser() actor: JwtPayload,
   ) {
