@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AppException } from '../../common/exceptions';
-import { ActorType, BanType, RoomStatus, UserStatus } from '../../common/enums';
+import { ActorType, BanDuration, BanType, RoomStatus, UserStatus } from '../../common/enums';
 import {
   HostProfile,
   Room,
@@ -172,6 +172,50 @@ export class BanService {
       meta,
     });
     return row;
+  }
+
+  async banLive(userId: string, actor: JwtPayload, meta?: RequestMetaDto) {
+    const current = await this.liveState(userId);
+    const user = await this.users.findById(userId);
+    if (current.liveBanned) {
+      return { ...(await this.decorate(user)), alreadyBanned: true };
+    }
+    const created = await this.create(
+      userId,
+      { type: BanType.LIVE, duration: BanDuration.PERMANENT, reason: 'Live ban' },
+      actor,
+      meta,
+    );
+    return { ...created.user, alreadyBanned: false };
+  }
+
+  async unbanLive(userId: string, actor: JwtPayload, meta?: RequestMetaDto) {
+    await this.expireStaleForUser(userId);
+    const active = await this.activeForUser(userId, BanType.LIVE);
+    for (const row of active) {
+      row.revokedAt = new Date();
+      await this.bans.save(row);
+    }
+    await this.audit.log({
+      actorType: ActorType.STAFF,
+      actorId: actor.sub,
+      action: 'user.unban.live',
+      targetType: 'user',
+      targetId: userId,
+      after: { lifted: active.length },
+      meta,
+    });
+    const user = await this.users.findById(userId);
+    return { ...(await this.decorate(user)), alreadyClear: active.length === 0 };
+  }
+
+  async liveState(userId: string) {
+    await this.expireStaleForUser(userId);
+    const liveBan = (await this.activeForUser(userId, BanType.LIVE))[0];
+    return {
+      liveBanned: Boolean(liveBan),
+      liveBannedUntil: liveBan?.expiresAt ?? null,
+    };
   }
 
   async unbanId(userId: string, actor: JwtPayload, meta?: RequestMetaDto) {

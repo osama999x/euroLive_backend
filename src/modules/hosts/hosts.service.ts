@@ -14,6 +14,7 @@ import { PaginationQueryDto, PaginatedResultDto } from '../../common/dto';
 import { comparePassword, getPagination, hashPassword } from '../../common/utils';
 import { HostProfile, User } from '../../database/entities';
 import { UsersService } from '../users/users.service';
+import { BanService } from '../users/ban.service';
 import { WalletService } from '../wallet/wallet.service';
 import { AuditService } from '../audit/audit.service';
 import { FreezeService } from '../security/freeze.service';
@@ -31,6 +32,7 @@ export class HostsService {
     private readonly wallets: WalletService,
     private readonly audit: AuditService,
     private readonly freeze: FreezeService,
+    private readonly bans: BanService,
   ) {}
 
   async create(
@@ -126,7 +128,11 @@ export class HostsService {
       qb.andWhere('host.country = :country', { country: query.country.toUpperCase() });
     }
     const [items, total] = await qb.skip(skip).take(take).getManyAndCount();
-    return new PaginatedResultDto(items.map((row) => this.toPublic(row)), total, page, limit);
+    const publics = [];
+    for (const row of items) {
+      publics.push(await this.withLive(row));
+    }
+    return new PaginatedResultDto(publics, total, page, limit);
   }
 
   async update(
@@ -243,7 +249,58 @@ export class HostsService {
       actorType: ActorType.STAFF,
       meta,
     });
-    return this.toPublic(await this.findById(id));
+    return this.withLive(await this.findById(id));
+  }
+
+  async unfreezeHost(id: string, actor: JwtPayload, meta?: RequestMetaDto) {
+    this.assertMaster(actor);
+    const profile = await this.findById(id);
+    if (profile.status !== HostStatus.FROZEN) {
+      throw new AppException('Host is not frozen', HttpStatus.BAD_REQUEST);
+    }
+    profile.status = HostStatus.ACTIVE;
+    await this.hosts.save(profile);
+    if (profile.user && profile.user.status === UserStatus.BANNED) {
+      const flags = await this.bans.decorate(profile.user);
+      if (!flags.idBanned) {
+        profile.user.status = UserStatus.ACTIVE;
+        await this.users.save(profile.user);
+      }
+    }
+    await this.freeze.restoreOwner(
+      WalletOwnerType.HOST_SALARY,
+      profile.id,
+      actor,
+      'Unfreeze host',
+      meta,
+    );
+    await this.audit.log({
+      actorType: ActorType.STAFF,
+      actorId: actor.sub,
+      action: 'host.unfreeze',
+      targetType: 'host',
+      targetId: id,
+      meta,
+    });
+    return this.withLive(await this.findById(id));
+  }
+
+  async banLive(id: string, actor: JwtPayload, meta?: RequestMetaDto) {
+    const profile = await this.findById(id);
+    const result = await this.bans.banLive(profile.userId, actor, meta);
+    return {
+      ...(await this.withLive(profile)),
+      alreadyBanned: Boolean(result.alreadyBanned),
+    };
+  }
+
+  async unbanLive(id: string, actor: JwtPayload, meta?: RequestMetaDto) {
+    const profile = await this.findById(id);
+    const result = await this.bans.unbanLive(profile.userId, actor, meta);
+    return {
+      ...(await this.withLive(await this.findById(id))),
+      alreadyClear: Boolean(result.alreadyClear),
+    };
   }
 
   async setSalaryPin(profileId: string, pin: string, currentPin?: string) {
@@ -288,6 +345,15 @@ export class HostsService {
 
   isOfficialProtectedUser(user: User): boolean {
     return Boolean(user.isOfficial);
+  }
+
+  async withLive(profile: HostProfile) {
+    const flags = await this.bans.liveState(profile.userId);
+    return {
+      ...this.toPublic(profile),
+      liveBanned: flags.liveBanned,
+      liveBannedUntil: flags.liveBannedUntil,
+    };
   }
 
   toPublic(profile: HostProfile) {

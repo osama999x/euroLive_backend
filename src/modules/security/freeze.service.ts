@@ -94,6 +94,26 @@ export class FreezeService {
     return new PaginatedResultDto(items, total, page, limit);
   }
 
+  async restoreOwner(
+    ownerType: string,
+    ownerId: string,
+    actor: JwtPayload,
+    note: string,
+    meta?: RequestMetaDto,
+  ): Promise<number> {
+    const rows = await this.freezes.find({
+      where: {
+        ownerType,
+        ownerId,
+        status: In([FreezeStatus.FROZEN, FreezeStatus.PENDING_REVIEW]),
+      },
+    });
+    for (const row of rows) {
+      await this.review(row.id, 'restore', actor, note, meta);
+    }
+    return rows.length;
+  }
+
   async review(
     id: string,
     action: 'restore' | 'confirm' | 'ban',

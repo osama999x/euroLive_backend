@@ -141,6 +141,32 @@ export class AgenciesService {
     return this.toPublic(agency);
   }
 
+  async unfreezeAgency(id: string, actor: JwtPayload, meta?: RequestMetaDto) {
+    const agency = await this.findById(id);
+    if (agency.status !== AgencyStatus.FROZEN && !agency.frozen) {
+      throw new AppException('Agency is not frozen', HttpStatus.BAD_REQUEST);
+    }
+    agency.frozen = false;
+    agency.status = AgencyStatus.ACTIVE;
+    await this.agencies.save(agency);
+    await this.freeze.restoreOwner(
+      WalletOwnerType.AGENCY,
+      id,
+      actor,
+      'Unfreeze agency',
+      meta,
+    );
+    await this.audit.log({
+      actorType: ActorType.STAFF,
+      actorId: actor.sub,
+      action: 'agency.unfreeze',
+      targetType: 'agency',
+      targetId: id,
+      meta,
+    });
+    return this.toPublic(agency);
+  }
+
   async verifyPassword(agency: Agency, password: string): Promise<boolean> {
     return comparePassword(password, agency.passwordHash);
   }

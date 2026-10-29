@@ -821,10 +821,14 @@ Audit rows now include `reason` and `caseNumber`. There is **no PATCH/DELETE** f
 |---|---|---|
 | POST/GET/PATCH | `/admin/agencies` | staff (freeze = Master) |
 | POST | `/admin/agencies/:id/freeze` | Master `{ reason }` |
+| POST | `/admin/agencies/:id/unfreeze` | Master — restores the agency and open freeze cases |
 | POST/GET/PATCH | `/admin/hosts` | staff |
 | POST | `/admin/hosts/:id/protection-lock` | Master |
 | POST | `/admin/hosts/:id/protection-unlock` | Master |
 | POST | `/admin/hosts/:id/freeze` | Master |
+| POST | `/admin/hosts/:id/unfreeze` | Master |
+| POST | `/admin/hosts/:id/live-ban` | Master, admin, or moderator — blocks Go Live |
+| POST | `/admin/hosts/:id/live-unban` | Master, admin, or moderator — lifts the live ban |
 | GET | `/agency/dashboard` | agency — share totals only |
 | GET | `/agency/hosts` | agency — roster, no salary |
 | GET | `/agency/shares` | agency |

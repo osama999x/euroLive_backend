@@ -75,4 +75,15 @@ export class AdminAgenciesController {
   ) {
     return this.agencies.freezeAgency(id, dto.reason, actor, meta);
   }
+
+  @Post(':id/unfreeze')
+  @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Master unfreeze an agency' })
+  unfreeze(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.agencies.unfreezeAgency(id, actor, meta);
+  }
 }

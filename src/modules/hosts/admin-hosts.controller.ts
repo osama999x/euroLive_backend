@@ -49,7 +49,7 @@ export class AdminHostsController {
   @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.FINANCE, StaffRole.SUPPORT)
   @ApiOperation({ summary: 'Host detail' })
   async get(@Param('id', ParseUUIDPipe) id: string) {
-    return this.hosts.toPublic(await this.hosts.findById(id));
+    return this.hosts.withLive(await this.hosts.findById(id));
   }
 
   @Patch(':id')
@@ -102,5 +102,38 @@ export class AdminHostsController {
     @RequestMeta() meta: RequestMetaDto,
   ) {
     return this.hosts.freezeHost(id, dto.reason, actor, meta);
+  }
+
+  @Post(':id/unfreeze')
+  @Roles(StaffRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Master unfreeze a host' })
+  unfreeze(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.hosts.unfreezeHost(id, actor, meta);
+  }
+
+  @Post(':id/live-ban')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'Ban this host from going live' })
+  banLive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.hosts.banLive(id, actor, meta);
+  }
+
+  @Post(':id/live-unban')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.MODERATOR)
+  @ApiOperation({ summary: 'Lift this host live ban' })
+  unbanLive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.hosts.unbanLive(id, actor, meta);
   }
 }
