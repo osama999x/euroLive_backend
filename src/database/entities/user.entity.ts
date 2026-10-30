@@ -43,7 +43,7 @@ export class User extends BaseEntity {
   isOfficial: boolean;
 
   @Column({ type: 'varchar', nullable: true, unique: true })
-  officialId?: string;
+  officialId?: string | null;
 
   @Column({ type: 'jsonb', default: [] })
   deviceIds: string[];

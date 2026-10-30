@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AppException } from '../../common/exceptions';
 import { UserStatus, WalletOwnerType } from '../../common/enums';
 import { PaginationQueryDto, PaginatedResultDto } from '../../common/dto';
@@ -71,6 +71,35 @@ export class UsersService {
       throw new AppException('User not found', HttpStatus.NOT_FOUND);
     }
     return user;
+  }
+
+  async findByOfficialId(officialId: string): Promise<User | null> {
+    return this.users.findOne({ where: { officialId } });
+  }
+
+  /** Match a public ID, official ID, username, or account UUID. */
+  async findByAnyKey(key: string): Promise<User | null> {
+    const value = key.trim();
+    if (!value) return null;
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      );
+    const qb = this.users
+      .createQueryBuilder('user')
+      .where('user.publicId = :value', { value })
+      .orWhere('user.officialId = :value', { value })
+      .orWhere('LOWER(user.username) = LOWER(:value)', { value });
+    if (isUuid) {
+      qb.orWhere('user.id = :id', { id: value });
+    }
+    return qb.getOne();
+  }
+
+  async findManyByIds(ids: string[]): Promise<User[]> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (!unique.length) return [];
+    return this.users.find({ where: { id: In(unique) } });
   }
 
   async search(

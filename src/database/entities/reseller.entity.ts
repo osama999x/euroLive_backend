@@ -31,7 +31,21 @@ export class Reseller extends BaseEntity {
   isOfficial: boolean;
 
   @Column({ type: 'varchar', nullable: true, unique: true })
-  officialId?: string;
+  officialId?: string | null;
+
+  /** Consumer user this reseller carries as their official account. */
+  @Column({ type: 'uuid', nullable: true, unique: true })
+  officialUserId?: string | null;
+
+  /** Filled by ResellersService. Not a database column. */
+  officialUser?: {
+    id: string;
+    publicId: string;
+    username: string;
+    displayName: string;
+    officialId: string | null;
+    isOfficial: boolean;
+  } | null;
 
   @OneToOne(() => ResellerPermissions, (permissions) => permissions.reseller)
   permissions?: ResellerPermissions;

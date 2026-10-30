@@ -163,6 +163,22 @@ export class UpdateResellerDto {
   officialId?: string;
 }
 
+export class AssignOfficialUserDto {
+  @ApiProperty({
+    description: 'Public ID, username, official ID, or account UUID of the user to attach',
+  })
+  @IsString()
+  @IsNotEmpty()
+  userKey: string;
+
+  @ApiPropertyOptional({
+    description: 'Official ID this user will carry with the reseller. Defaults to their current official ID or public ID.',
+  })
+  @IsOptional()
+  @IsString()
+  officialId?: string;
+}
+
 export class UpdateCreditLimitDto {
   @ApiProperty()
   @IsInt()

@@ -22,6 +22,7 @@ import { JwtPayload } from '../../common/interfaces';
 import { ResellersService } from './resellers.service';
 import {
   AdjustBalanceDto,
+  AssignOfficialUserDto,
   CreateResellerDto,
   ResellerPermissionsDto,
   UpdateCreditLimitDto,
@@ -125,6 +126,31 @@ export class AdminResellersController {
       actor,
       meta,
     );
+  }
+
+  @Patch(':id/official')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({
+    summary: 'Attach a user as this reseller official account',
+  })
+  assignOfficial(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignOfficialUserDto,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.resellers.assignOfficialUser(id, dto, actor, meta);
+  }
+
+  @Delete(':id/official')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN)
+  @ApiOperation({ summary: 'Remove the official user from this reseller' })
+  clearOfficial(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: JwtPayload,
+    @RequestMeta() meta: RequestMetaDto,
+  ) {
+    return this.resellers.clearOfficialUser(id, actor, meta);
   }
 
   @Patch(':id/credit-limit')

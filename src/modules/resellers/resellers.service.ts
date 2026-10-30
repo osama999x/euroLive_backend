@@ -142,11 +142,12 @@ export class ResellersService {
     if (!reseller) {
       throw new AppException('Reseller not found', HttpStatus.NOT_FOUND);
     }
+    await this.attachOfficialMany([reseller]);
     return reseller;
   }
 
   async findByLogin(login: string): Promise<Reseller | null> {
-    return this.resellers
+    const reseller = await this.resellers
       .createQueryBuilder('reseller')
       .addSelect(['reseller.passwordHash'])
       .leftJoinAndSelect('reseller.permissions', 'permissions')
@@ -154,6 +155,9 @@ export class ResellersService {
         login,
       })
       .getOne();
+    if (!reseller) return null;
+    await this.attachOfficialMany([reseller]);
+    return reseller;
   }
 
   async list(
@@ -170,12 +174,13 @@ export class ResellersService {
     }
     if (query.search) {
       qb.andWhere(
-        '(reseller.username ILIKE :q OR reseller.email ILIKE :q OR reseller.displayName ILIKE :q)',
+        '(reseller.username ILIKE :q OR reseller.email ILIKE :q OR reseller.displayName ILIKE :q OR reseller.officialId ILIKE :q)',
         { q: `%${query.search}%` },
       );
     }
 
     const [rows, total] = await qb.skip(skip).take(take).getManyAndCount();
+    await this.attachOfficialMany(rows);
     return new PaginatedResultDto(
       rows.map((row) => this.toPublic(row)),
       total,
@@ -203,6 +208,99 @@ export class ResellersService {
       after: this.toPublic(saved),
       meta,
     });
+    return this.toPublic(await this.findById(id));
+  }
+
+  async assignOfficialUser(
+    id: string,
+    input: { userKey: string; officialId?: string },
+    actor: JwtPayload,
+    meta?: RequestMetaDto,
+  ) {
+    const userKey = input.userKey?.trim();
+    if (!userKey) {
+      throw new AppException('User ID is required', HttpStatus.BAD_REQUEST);
+    }
+    await this.findById(id);
+    const user = await this.users.findByAnyKey(userKey);
+    if (!user) {
+      throw new AppException('No user matches that ID', HttpStatus.NOT_FOUND);
+    }
+
+    const desired = (input.officialId?.trim() || user.officialId || user.publicId).trim();
+    if (!desired) {
+      throw new AppException('Official ID is required', HttpStatus.BAD_REQUEST);
+    }
+
+    const owner = await this.users.findByOfficialId(desired);
+    if (owner && owner.id !== user.id) {
+      owner.isOfficial = false;
+      owner.officialId = null;
+      await this.users.save(owner);
+      await this.resellers.manager.query(
+        `UPDATE "resellers" SET "officialUserId" = NULL, "isOfficial" = false, "officialId" = NULL WHERE "officialUserId" = $1`,
+        [owner.id],
+      );
+    }
+
+    user.isOfficial = true;
+    user.officialId = desired;
+    await this.users.save(user);
+
+    await this.resellers.manager.query(
+      `UPDATE "resellers"
+       SET "officialUserId" = NULL, "isOfficial" = false, "officialId" = NULL
+       WHERE id != $1 AND ("officialUserId" = $2 OR "officialId" = $3)`,
+      [id, user.id, desired],
+    );
+
+    const reseller = await this.findById(id);
+    reseller.officialUserId = user.id;
+    reseller.isOfficial = true;
+    reseller.officialId = desired;
+    await this.resellers.save(reseller);
+
+    await this.audit.log({
+      actorType: ActorType.STAFF,
+      actorId: actor.sub,
+      action: 'reseller.official.assign',
+      targetType: 'reseller',
+      targetId: id,
+      after: {
+        officialUserId: user.id,
+        officialId: desired,
+        publicId: user.publicId,
+        username: user.username,
+      },
+      meta,
+    });
+
+    return this.toPublic(await this.findById(id));
+  }
+
+  async clearOfficialUser(id: string, actor: JwtPayload, meta?: RequestMetaDto) {
+    const reseller = await this.findById(id);
+    const before = {
+      officialUserId: reseller.officialUserId ?? null,
+      officialId: reseller.officialId ?? null,
+    };
+    reseller.officialUserId = null;
+    reseller.isOfficial = false;
+    reseller.officialId = null;
+    reseller.officialUser = null;
+    await this.resellers.save(reseller);
+
+    await this.audit.log({
+      actorType: ActorType.STAFF,
+      actorId: actor.sub,
+      action: 'reseller.official.clear',
+      targetType: 'reseller',
+      targetId: id,
+      before,
+      after: { officialUserId: null, officialId: null },
+      meta,
+    });
+
     return this.toPublic(await this.findById(id));
   }
 
@@ -566,6 +664,8 @@ export class ResellersService {
       status: reseller.status,
       isOfficial: reseller.isOfficial,
       officialId: reseller.officialId ?? null,
+      officialUserId: reseller.officialUserId ?? null,
+      officialUser: reseller.officialUser ?? null,
       permissions: reseller.permissions
         ? {
             canRecharge: reseller.permissions.canRecharge,
@@ -585,6 +685,31 @@ export class ResellersService {
       createdAt: reseller.createdAt,
       updatedAt: reseller.updatedAt,
     };
+  }
+
+  private async attachOfficialMany(rows: Reseller[]) {
+    const ids = [
+      ...new Set(
+        rows
+          .map((row) => row.officialUserId)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ];
+    const users = await this.users.findManyByIds(ids);
+    const byId = new Map(users.map((user) => [user.id, user]));
+    for (const row of rows) {
+      const user = row.officialUserId ? byId.get(row.officialUserId) : undefined;
+      row.officialUser = user
+        ? {
+            id: user.id,
+            publicId: user.publicId,
+            username: user.username,
+            displayName: user.displayName,
+            officialId: user.officialId ?? null,
+            isOfficial: user.isOfficial,
+          }
+        : null;
+    }
   }
 
   private assertResellerActive(reseller: Reseller) {
